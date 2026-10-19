@@ -101,9 +101,14 @@ target_compile_definitions(expat
     PUBLIC
         _STATIC
     PRIVATE
-        COMPILED_FROM_DSP
         _LIB
 )
+
+if (WIN32)
+    target_compile_definitions(expat PRIVATE COMPILED_FROM_DSP)
+else ()
+    target_include_directories(expat PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/expat-mac)
+endif ()
 
 target_include_directories(expat
     PUBLIC
@@ -160,20 +165,21 @@ if (WOWDECOMP_ARCH_32)
 
     if (EXISTS ${DIVXDECODER_DLL})
         add_custom_target(DivxDecoderDll
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/bin/Win
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIVXDECODER_DLL} ${CMAKE_SOURCE_DIR}/bin/Win/DivxDecoder.dll
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${WOWDECOMP_BIN_DIR}
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${DIVXDECODER_DLL} ${WOWDECOMP_BIN_DIR}/DivxDecoder.dll
         )
 
         add_dependencies(DivxDecoder DivxDecoderDll)
     else ()
         message(WARNING "DivxDecoder: ${DIVXDECODER_DLL} is missing. Copy DivxDecoder.dll from a 3.3.5a (12340) client there; Win32 builds need it next to the executables.")
     endif ()
-else ()
+elseif (WIN32)
     target_link_libraries(DivxDecoder
         INTERFACE
             XvidDecoder
     )
 endif ()
+# macOS: no movie decoder yet (needs xvidcore built from source for arm64).
 
 if (WIN32)
     add_library(lgLcd STATIC

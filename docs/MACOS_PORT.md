@@ -78,6 +78,19 @@ Each phase ends with something that builds or runs, so progress can be checked a
 **Done when:** `cmake -S . -B build/mac` configures, and ThirdParty (zlib, bzip2, lzma, expat, freetype,
 pcre, lua) builds.
 
+**Status: done.** `cmake/Platform.cmake` picks sources per platform (`wowdecomp_platform_sources`), and
+`Engine/Source/Base/Platform.h` is force-included on macOS. Configure succeeds, and ThirdParty, `jpeg`, `lua` and
+`pcreposix` build for arm64. Full keep-going build: 730 failed objects. The errors that remain, in order of
+impact (they open Phase 1):
+
+1. `<windows.h>` in widely shared headers: `BlizzardCore/.../Lock/Lock.h` (`CRITICAL_SECTION` mutex type),
+   `BlizzardCore/SFile2-Core.h`, `Storm/H/stpl.h`, `Storm/Source/SLock.h`, `Base/CDataStore.h`, `Gx/CGxDevice/*.h`,
+   `fmod.h`. Fixing the lock types alone unblocks most modules.
+2. "declaration shadows template parameter" (~100). MSVC accepts this, Clang doesn't. Rename the shadowing locals.
+3. x86-only intrinsic headers (`xmmintrin.h`, ...) on arm64: bring in sse2neon.
+4. Odds and ends: `process.h`, `mbstring.h`, `winerror.h`, `reinterpret_cast` dropping `const`, NEON vector types
+   passed to builtins.
+
 ### Phase 1: Portability shim + compile the portable modules
 
 - Add `Engine/Source/Base/Platform.h` (or similar) with:

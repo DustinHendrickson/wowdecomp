@@ -1,6 +1,9 @@
 file(GLOB CLIENT_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/WoW/Source/*.cpp")
 
-if (WOWDECOMP_ARCH_64)
+if (WOWDECOMP_PLATFORM_MAC)
+    file(GLOB CLIENT_PLATFORM_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/WoW/Source/Mac/*.cpp" "${CMAKE_SOURCE_DIR}/WoW/Source/Mac/*.mm")
+    set(WOWCLIENT_OUTPUT_NAME WowClient)
+elseif (WOWDECOMP_ARCH_64)
     file(GLOB CLIENT_PLATFORM_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/WoW/Source/Win64/*.cpp")
     set(WOWCLIENT_OUTPUT_NAME WowClient64)
 else ()
@@ -16,19 +19,22 @@ endif ()
 option(WOWCLIENT_CRASH_LOG "Crash logger with console window and WowClient_crash.log (re/tools/build release mode turns it off)" ON)
 set(CLIENT_TOOL_SOURCES "")
 if (WOWCLIENT_CRASH_LOG)
-    list(APPEND CLIENT_TOOL_SOURCES crash_log.cpp)
+    # The macOS crash logger (sigaction + backtrace) is still to be written; crash_log.cpp is Windows-only.
+    if (WOWDECOMP_PLATFORM_WIN)
+        list(APPEND CLIENT_TOOL_SOURCES crash_log.cpp)
+    endif ()
 endif ()
 
 add_executable(WowClient WIN32 ${CLIENT_SOURCES} ${CLIENT_PLATFORM_SOURCES} ${CLIENT_TOOL_SOURCES})
 
 set_target_properties(WowClient PROPERTIES
     OUTPUT_NAME ${WOWCLIENT_OUTPUT_NAME}
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/Win
+    RUNTIME_OUTPUT_DIRECTORY ${WOWDECOMP_BIN_DIR}
 )
 
 foreach (config ${CMAKE_CONFIGURATION_TYPES} ${CMAKE_BUILD_TYPE})
     string(TOUPPER ${config} config)
-    set_target_properties(WowClient PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${config} ${CMAKE_SOURCE_DIR}/bin/Win)
+    set_target_properties(WowClient PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${config} ${WOWDECOMP_BIN_DIR})
 endforeach ()
 
 target_include_directories(WowClient
@@ -36,7 +42,10 @@ target_include_directories(WowClient
         ${CMAKE_SOURCE_DIR}
 )
 
-target_link_options(WowClient PRIVATE "/INCREMENTAL:NO" "/ENTRY:start")
+if (WOWDECOMP_PLATFORM_WIN)
+    target_link_options(WowClient PRIVATE "/INCREMENTAL:NO" "/ENTRY:start")
+    target_link_libraries(WowClient PRIVATE SteelseriesMouse dbghelp)
+endif ()
 
 target_link_libraries(WowClient
     PRIVATE
@@ -61,7 +70,6 @@ target_link_libraries(WowClient
         ShaderEffect
         Tempest
         SoundEngine
-        SteelseriesMouse
         Storm
         WoWCommon
         Battlenet
@@ -83,5 +91,4 @@ target_link_libraries(WowClient
         LiquidSystem
         WowServices
         WowSvcs
-        dbghelp
 )

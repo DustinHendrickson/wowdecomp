@@ -1,6 +1,8 @@
 file(GLOB PRIVATE_SOURCES CONFIGURE_DEPENDS "*.cpp")
 
-if (WOWDECOMP_ARCH_64)
+if (WOWDECOMP_PLATFORM_MAC)
+    file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Mac/*.cpp" "Mac/*.mm")
+elseif (WOWDECOMP_ARCH_64)
     file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Win64/*.cpp")
 else ()
     file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Win32/*.cpp")
@@ -8,7 +10,9 @@ endif ()
 
 add_executable(Wow WIN32 ${PRIVATE_SOURCES} ${PLATFORM_SOURCES})
 
-if (WOWDECOMP_ARCH_64)
+if (WOWDECOMP_PLATFORM_MAC)
+    set(WOW_OUTPUT_NAME Wow)
+elseif (WOWDECOMP_ARCH_64)
     set(WOW_OUTPUT_NAME Wow64)
 else ()
     set(WOW_OUTPUT_NAME Wow32)
@@ -16,12 +20,12 @@ endif ()
 
 set_target_properties(Wow PROPERTIES
     OUTPUT_NAME ${WOW_OUTPUT_NAME}
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/Win
+    RUNTIME_OUTPUT_DIRECTORY ${WOWDECOMP_BIN_DIR}
 )
 
 foreach (config ${CMAKE_CONFIGURATION_TYPES} ${CMAKE_BUILD_TYPE})
     string(TOUPPER ${config} config)
-    set_target_properties(Wow PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${config} ${CMAKE_SOURCE_DIR}/bin/Win)
+    set_target_properties(Wow PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${config} ${WOWDECOMP_BIN_DIR})
 endforeach ()
 
 target_include_directories(Wow
@@ -29,7 +33,10 @@ target_include_directories(Wow
         ${CMAKE_SOURCE_DIR}
 )
 
-target_link_options(Wow PRIVATE "/INCREMENTAL:NO" "/ENTRY:start")
+if (WOWDECOMP_PLATFORM_WIN)
+    target_link_options(Wow PRIVATE "/INCREMENTAL:NO" "/ENTRY:start")
+    target_link_libraries(Wow PRIVATE SteelseriesMouse)
+endif ()
 
 target_link_libraries(Wow
     PRIVATE
@@ -54,7 +61,6 @@ target_link_libraries(Wow
         ShaderEffect
         Tempest
         SoundEngine
-        SteelseriesMouse
         Storm
         WoWCommon
         Battlenet

@@ -1,4 +1,5 @@
 file(GLOB_RECURSE PRIVATE_SOURCES CONFIGURE_DEPENDS "*.cpp")
+wowdecomp_platform_sources(PRIVATE_SOURCES)
 
 add_library(Os STATIC
     ${PRIVATE_SOURCES}
@@ -18,5 +19,10 @@ if(WIN32)
             dinput8
             dxguid
             version
+    )
+elseif (APPLE)
+    target_link_libraries(Os
+        PUBLIC
+            ${WOWDECOMP_MAC_FRAMEWORKS}
     )
 endif()

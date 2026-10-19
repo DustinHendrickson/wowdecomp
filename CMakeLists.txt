@@ -8,14 +8,19 @@ if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
     )
 endif ()
 
+if (APPLE)
+    # Apple Silicon is the macOS target. Set before project() so the toolchain picks it up.
+    set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "macOS architectures")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS version")
+endif ()
+
 project(wowdecomp CXX C)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if (NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
-    message(FATAL_ERROR "wowdecomp targets Windows only.")
-endif ()
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+include(Platform)
 
 # x64 is the target. Win32 stays buildable: it is the configuration whose struct layouts can be
 # checked against Wow.exe 3.3.5a (12340).
@@ -39,13 +44,18 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-add_compile_definitions(
-    WIN32
-    _WINDOWS
-    NOMINMAX
-    WIN32_LEAN_AND_MEAN
-    _CRT_SECURE_NO_WARNINGS
-)
+if (WOWDECOMP_PLATFORM_WIN)
+    add_compile_definitions(
+        WOWDECOMP_PLATFORM_WIN=1
+        WIN32
+        _WINDOWS
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        _CRT_SECURE_NO_WARNINGS
+    )
+else ()
+    add_compile_definitions(WOWDECOMP_PLATFORM_MAC=1)
+endif ()
 
 # Off by default: the client checks MPQ file MD5s (signaturefile) and GlueXML/FrameXML/AddOn .toc.sig files like the
 # original. ON accepts unsigned or modified game data and interface files.
@@ -57,6 +67,10 @@ endif ()
 # Third-party code is linked, not decompiled, for now.
 if (EXISTS ${CMAKE_SOURCE_DIR}/ThirdParty/CMakeLists.txt)
     add_subdirectory(ThirdParty)
+endif ()
+
+if (WOWDECOMP_PLATFORM_MAC)
+    wowdecomp_mac_compile_options()
 endif ()
 
 add_subdirectory(Engine/Source/BLPFile)
@@ -81,7 +95,9 @@ add_subdirectory(Engine/Source/Scrn)
 add_subdirectory(Engine/Source/Services)
 add_subdirectory(Engine/Source/ShaderEffect)
 add_subdirectory(Engine/Source/SoundEngine)
-add_subdirectory(Engine/Source/SteelseriesMouse)
+if (WOWDECOMP_PLATFORM_WIN)
+    add_subdirectory(Engine/Source/SteelseriesMouse)
+endif ()
 add_subdirectory(Engine/Source/Storm)
 add_subdirectory(Engine/Source/Tempest)
 add_subdirectory(WoW/Common)
@@ -105,15 +121,15 @@ add_subdirectory(WoW/Source/WorldClient)
 add_subdirectory(WoW/Source/WowServices)
 add_subdirectory(WoW/Source/WowSvcs)
 add_subdirectory(WoW/Source)
-if (WIN32)
-    add_subdirectory(Tools/WowClient)
-endif ()
-if (WOWDECOMP_ARCH_64)
+add_subdirectory(Tools/WowClient)
+if (WOWDECOMP_PLATFORM_WIN AND WOWDECOMP_ARCH_64)
     add_subdirectory(Tools/XvidDecoder)
 endif ()
 
-foreach (target Wow WowClient MapViewer M2Viewer GxTest MpqTest BlpTest DbcTest AssetCheck)
-    if (TARGET ${target})
-        target_sources(${target} PRIVATE ${CMAKE_SOURCE_DIR}/waystone.rc)
-    endif ()
-endforeach ()
+if (WOWDECOMP_PLATFORM_WIN)
+    foreach (target Wow WowClient MapViewer M2Viewer GxTest MpqTest BlpTest DbcTest AssetCheck)
+        if (TARGET ${target})
+            target_sources(${target} PRIVATE ${CMAKE_SOURCE_DIR}/waystone.rc)
+        endif ()
+    endforeach ()
+endif ()
