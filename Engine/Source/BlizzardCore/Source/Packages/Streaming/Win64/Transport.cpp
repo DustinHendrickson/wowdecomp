@@ -5,7 +5,11 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#if defined(_WIN32)
 #include <windows.h>
+#else
+#include "Engine/Source/BlizzardCore/Source/System/Lock/Mac/Win32Sync.h"
+#endif
 #include "Engine/Source/BlizzardCore/Include/Blizzard/Util/Digest.h"
 #include "Engine/Source/BlizzardCore/Include/Blizzard/Util/MD5.h"
 #include "Engine/Source/BlizzardCore/Source/Packages/Streaming/Manifests.h"

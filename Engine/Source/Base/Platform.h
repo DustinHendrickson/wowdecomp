@@ -75,13 +75,19 @@ typedef char* LPSTR;
 #endif
 
 // Win32 types that shared headers declare. CRITICAL_SECTION is held by value (Blizzard::Lock::Mutex, SCritSect,
-// CCritSect), so it gets a real type: the Mac implementations treat it as a recursive pthread mutex, matching
-// critical-section semantics. The others only appear as pointer parameters of Windows-implementation functions,
-// so they stay opaque: shared code that touches their members fails to compile, which marks it for a Mac version.
-typedef pthread_mutex_t CRITICAL_SECTION;
+// CCritSect), so it gets a real type: a recursive pthread mutex, matching critical-section semantics. DebugInfo is
+// there because decompiled code clears it after DeleteCriticalSection, as the MSVC inlining did. The others only
+// appear as pointer parameters of Windows-implementation functions, so they stay opaque: shared code that touches
+// their members fails to compile, which marks it for a Mac version.
+typedef struct _CRITICAL_SECTION {
+    pthread_mutex_t mutex;
+    void* DebugInfo;
+} CRITICAL_SECTION;
 typedef struct _OVERLAPPED OVERLAPPED;
 typedef struct _SYSTEMTIME SYSTEMTIME;
 typedef union _LARGE_INTEGER LARGE_INTEGER;
+typedef struct _CONTEXT CONTEXT;
+typedef struct _EXCEPTION_POINTERS EXCEPTION_POINTERS;
 
 typedef struct tagRECT {
     LONG left;
@@ -221,20 +227,20 @@ static inline void InitializeCriticalSection(CRITICAL_SECTION* section) {
     pthread_mutexattr_t attributes;
     pthread_mutexattr_init(&attributes);
     pthread_mutexattr_settype(&attributes, PTHREAD_MUTEX_RECURSIVE);
-    pthread_mutex_init(section, &attributes);
+    pthread_mutex_init(&section->mutex, &attributes);
     pthread_mutexattr_destroy(&attributes);
 }
 
 static inline void DeleteCriticalSection(CRITICAL_SECTION* section) {
-    pthread_mutex_destroy(section);
+    pthread_mutex_destroy(&section->mutex);
 }
 
 static inline void EnterCriticalSection(CRITICAL_SECTION* section) {
-    pthread_mutex_lock(section);
+    pthread_mutex_lock(&section->mutex);
 }
 
 static inline void LeaveCriticalSection(CRITICAL_SECTION* section) {
-    pthread_mutex_unlock(section);
+    pthread_mutex_unlock(&section->mutex);
 }
 
 // Small Win32 calls that shared code makes directly.

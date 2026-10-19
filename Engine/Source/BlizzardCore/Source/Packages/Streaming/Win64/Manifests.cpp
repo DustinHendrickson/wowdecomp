@@ -2,7 +2,11 @@
 
 #include <cstdint>
 #include <string>
+#if defined(_WIN32)
 #include <windows.h>
+#else
+#include "Engine/Source/BlizzardCore/Source/System/Lock/Mac/Win32Sync.h"
+#endif
 #include "Engine/Source/BlizzardCore/Source/Packages/Streaming/Manifests.h"
 #include "Engine/Source/BlizzardCore/Source/System/File/File.h"
 #include "Engine/Source/BlizzardCore/Source/System/String/String.h"

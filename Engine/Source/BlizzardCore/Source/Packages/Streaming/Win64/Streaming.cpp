@@ -7,7 +7,11 @@
 #include <map>
 #include <string>
 #include <vector>
+#if defined(_WIN32)
 #include <windows.h>
+#else
+#include "Engine/Source/BlizzardCore/Source/System/Lock/Mac/Win32Sync.h"
+#endif
 #include "Engine/Source/BlizzardCore/Include/Blizzard/Util/MD5.h"
 #include "Engine/Source/BlizzardCore/Source/Packages/Streaming/Manifests.h"
 #include "Engine/Source/BlizzardCore/Source/Packages/Streaming/Storage.h"
@@ -1153,6 +1157,7 @@ bool Blizzard::Streaming::InitializeStreaming(const char* manifest, const char* 
     return false;
 }
 
+#if defined(_WIN32)
 // OFFSET: 0x004294C0
 char* GetComponentVersionData(uint32_t* size) {
     *size = 0;
@@ -1178,6 +1183,7 @@ char* GetComponentVersionData(uint32_t* size) {
 
     return data;
 }
+#endif
 
 // OFFSET: 0x0044B570
 std::string Blizzard::Streaming::ResolveFilePath(const std::string& path) {

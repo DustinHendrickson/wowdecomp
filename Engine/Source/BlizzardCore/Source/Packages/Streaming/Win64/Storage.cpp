@@ -6,7 +6,11 @@
 #include <map>
 #include <string>
 #include <vector>
+#if defined(_WIN32)
 #include <windows.h>
+#else
+#include "Engine/Source/BlizzardCore/Source/System/Lock/Mac/Win32Sync.h"
+#endif
 #include "Engine/Source/BlizzardCore/Source/Packages/Streaming/Storage.h"
 #include "Engine/Source/BlizzardCore/Source/Packages/Streaming/Streaming.h"
 #include "Engine/Source/BlizzardCore/Source/System/File/File.h"

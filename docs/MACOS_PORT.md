@@ -170,6 +170,24 @@ SThread. Notes:
   backslash paths) passes.
 - Undefined symbols at link: 387 -> 286.
 
+**Status: BlizzardCore and Storm done.** The rest of both modules now has Mac versions too: Log, Debug, Hardware,
+Version, Unicode, URL (system libcurl), iounit, plus Storm SErr, SLog, SReg (CFPreferences, domain
+`org.wowdecomp.client`), SCmd, SServer, IOFileUnit and a small MachineState. Notes:
+
+- Streaming (`Manifests`, `Storage`, `Streaming`, `Transport`; ~3,300 decompiled lines) builds from `Win64/` as it
+  is. Its only Windows dependencies are events and waits, which `Lock/Mac/Win32Sync.h` provides on MacWaitable.
+  The `BLIZZARDCOMPONENT` resource reader is wrapped in `#if defined(_WIN32)`, with a Mac version that returns no
+  data. `Storm/Source/Win64/SMsg.cpp` also builds as it is.
+- `CRITICAL_SECTION` in `Platform.h` is now `{ pthread_mutex_t mutex; void* DebugInfo; }`, because decompiled code
+  clears `DebugInfo` after deleting a lock.
+- SErr writes `Errors/<date> Error.txt` / `Crash.txt` next to the game (header, registers, demangled stack),
+  shows a CFUserNotification dialog, and catches crashes with `sigaction` on an alternate stack.
+- BlizzardCore + Storm now link stand-alone on macOS. A second smoke test passes: registry round trip, logs, error
+  and crash logs (a real fault in a child process), Storm IOUnits (buffered and unbuffered), and HTTP GET / 404 / HEAD
+  through libcurl against a local server.
+- Undefined symbols at link: 286 -> 225. What's left is Os, the FMOD platform layer, Net, LCD stubs,
+  Warden/BotCheck, Gx, Battlenet/ComSat, the movie decoder and `main`.
+
 SEH (`__try/__except`) in these layers becomes `sigaction`/`setjmp` handlers or plain error checks.
 D3D's SEH stays in the Windows-only backend.
 
