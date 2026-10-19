@@ -64,6 +64,13 @@ macro (wowdecomp_mac_compile_options)
     )
     # Stand-ins for MSVC CRT headers that macOS lacks (<malloc.h>).
     include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/Engine/Source/Base/Compat/Mac)
+    # arm64: <xmmintrin.h> / <emmintrin.h> resolve to sse2neon wrappers.
+    if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
+        include_directories(BEFORE SYSTEM
+            ${CMAKE_SOURCE_DIR}/Engine/Source/Base/Compat/MacArm64
+            ${CMAKE_SOURCE_DIR}/ThirdParty/sse2neon
+        )
+    endif ()
 endmacro ()
 
 # Where the client executables go.

@@ -118,9 +118,10 @@ impact (they open Phase 1):
 **Done when:** every module except the platform layers compiles with Clang on arm64. (Linking isn't
 expected yet.)
 
-**Status: nearly done.** 49 of 52 libraries build. The 5 files left all include x86 SSE headers
-(`ComSat/SPIRIT/SpiritFrame.cpp`, `SpiritPitch.cpp`, `Model2/M2Model.cpp`, `M2Scene.cpp`,
-`WoW/Common/ComponentCore/CharacterComponent.cpp`) and are waiting on sse2neon. What changed:
+**Status: done.** All 52 libraries build on arm64. SSE code uses
+[sse2neon](https://github.com/DLTcollab/sse2neon) v1.9.1, vendored in `ThirdParty/sse2neon`: on arm64,
+`Engine/Source/Base/Compat/MacArm64` makes `<xmmintrin.h>` / `<emmintrin.h>` resolve to it, so the five SSE sources
+are unchanged. What changed:
 
 - Shared files include `<windows.h>` (and `process.h`, `winerror.h`, `mbstring.h`) only under `_WIN32`.
 - `Platform.h` gained `CRITICAL_SECTION` (= recursive `pthread_mutex_t` in the Mac lock code), `RECT`,
@@ -133,6 +134,11 @@ expected yet.)
 - `UILCD/LCD.cpp` (Logitech LCD) is excluded on Mac. Phase 2 needs `CGLCD` stubs.
 
 Not checked yet: `long` (LP64) audit and `wchar_t` usage. These compile cleanly but can be wrong at runtime.
+
+**Link status (start of Phase 2):** `Wow` / `WowClient` fail to link with 387 undefined symbols, the functions
+the excluded `Win64/` folders provided. By area: Os ~105, BlizzardCore ~95 (File, Lock, Streaming, Thread, Time,
+Log), Storm ~68, FMOD platform layer ~39, Net (`WowConnection*`) ~23, LCD stubs 17, Warden/BotCheck 9, Gx 8,
+Battlenet/ComSat 6, movie decoder 3, and `main`.
 
 ### Phase 2: Mac platform layer (the bulk of the work)
 
