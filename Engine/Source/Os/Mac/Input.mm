@@ -250,6 +250,25 @@ void ApplyMouseLock() {
 }
 
 @interface WowGameView : NSView <NSTextInputClient, NSWindowDelegate>
+@property(nonatomic) OsMacWindowListener listener;
+@property(nonatomic) void* listenerParam;
+@property(nonatomic) NSWindowStyleMask windowedStyle;
+@end
+
+// Borderless windows can't become key unless they say so, and the fullscreen game window is borderless.
+@interface WowGameWindow : NSWindow
+@end
+
+@implementation WowGameWindow
+
+- (BOOL)canBecomeKeyWindow {
+    return YES;
+}
+
+- (BOOL)canBecomeMainWindow {
+    return YES;
+}
+
 @end
 
 @implementation WowGameView {
@@ -512,8 +531,19 @@ void ApplyMouseLock() {
     return NO;
 }
 
+- (void)notify:(OsMacWindowEvent)event {
+    if (self.listener) {
+        self.listener(self.listenerParam, event);
+    }
+}
+
 - (void)windowDidResize:(NSNotification*)notification {
     s_windowSize = 1;
+    [self notify:OsMacWindowEvent_Resized];
+}
+
+- (void)windowDidDeminiaturize:(NSNotification*)notification {
+    [self notify:OsMacWindowEvent_Restored];
 }
 
 - (void)windowDidChangeBackingProperties:(NSNotification*)notification {
@@ -537,14 +567,17 @@ void ApplyMouseLock() {
 
 - (void)windowDidBecomeKey:(NSNotification*)notification {
     [self setActive:1];
+    [self notify:OsMacWindowEvent_FocusGained];
 }
 
 - (void)windowDidResignKey:(NSNotification*)notification {
     [self setActive:0];
+    [self notify:OsMacWindowEvent_FocusLost];
 }
 
 - (void)windowDidMiniaturize:(NSNotification*)notification {
     [self setActive:0];
+    [self notify:OsMacWindowEvent_Minimized];
 }
 
 // Live resizing runs a modal loop; keep the game ticking through it, as the Windows timer does during drags.
@@ -628,7 +661,7 @@ void* OsMacCreateGameWindow(const char* title, int32_t x, int32_t y, int32_t wid
     @autoreleasepool {
         NSRect content = NSMakeRect(0, 0, width, height);
         NSWindowStyleMask style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
-        NSWindow* window = [[NSWindow alloc] initWithContentRect:content styleMask:style backing:NSBackingStoreBuffered defer:NO];
+        NSWindow* window = [[WowGameWindow alloc] initWithContentRect:content styleMask:style backing:NSBackingStoreBuffered defer:NO];
 
         if (!window) {
             return nullptr;
@@ -640,6 +673,7 @@ void* OsMacCreateGameWindow(const char* title, int32_t x, int32_t y, int32_t wid
         window.collectionBehavior = NSWindowCollectionBehaviorFullScreenPrimary;
 
         WowGameView* view = [[WowGameView alloc] initWithFrame:content];
+        view.windowedStyle = style;
         view.wantsLayer = YES;
         view.layer.backgroundColor = NSColor.blackColor.CGColor;
         window.contentView = view;
@@ -682,6 +716,46 @@ void OsMacDestroyGameWindow(void* window) {
     NSWindow* object = (__bridge_transfer NSWindow*)window;
     object.delegate = nil;
     [object close];
+}
+
+void OsMacGetContentSize(void* window, int32_t* width, int32_t* height) {
+    NSSize size = ((__bridge NSWindow*)window).contentView.bounds.size;
+    *width = static_cast<int32_t>(size.width);
+    *height = static_cast<int32_t>(size.height);
+}
+
+void OsMacGetContentScreenOrigin(void* window, int32_t* x, int32_t* y) {
+    NSWindow* object = (__bridge NSWindow*)window;
+    NSRect content = [object convertRectToScreen:[object.contentView convertRect:object.contentView.bounds toView:nil]];
+    CGFloat mainHeight = NSScreen.screens.firstObject.frame.size.height;
+    *x = static_cast<int32_t>(content.origin.x);
+    *y = static_cast<int32_t>(mainHeight - (content.origin.y + content.size.height));
+}
+
+void OsMacSetWindowFullscreen(void* window, bool fullscreen, int32_t width, int32_t height) {
+    NSWindow* object = (__bridge NSWindow*)window;
+    WowGameView* view = (WowGameView*)object.contentView;
+    NSScreen* screen = object.screen ? object.screen : NSScreen.mainScreen;
+
+    if (fullscreen) {
+        NSApp.presentationOptions = NSApplicationPresentationHideDock | NSApplicationPresentationHideMenuBar;
+        object.styleMask = NSWindowStyleMaskBorderless;
+        [object setFrame:screen.frame display:YES];
+    } else {
+        NSApp.presentationOptions = NSApplicationPresentationDefault;
+        object.styleMask = view.windowedStyle;
+        [object setContentSize:NSMakeSize(width, height)];
+        [object center];
+    }
+
+    [object makeKeyAndOrderFront:nil];
+    [object makeFirstResponder:view];
+}
+
+void OsMacSetWindowListener(void* window, OsMacWindowListener listener, void* param) {
+    WowGameView* view = (WowGameView*)((__bridge NSWindow*)window).contentView;
+    view.listener = listener;
+    view.listenerParam = param;
 }
 
 void OsQueuePut(OSINPUT id, int32_t param0, int32_t param1, int32_t param2, int32_t param3) {

@@ -229,6 +229,31 @@ D3D's SEH stays in the Windows-only backend.
 
 **Done when:** login screen, character select, and in-world rendering are visually correct.
 
+**Status: device up.** The decompiled OpenGL device (`CGxDeviceOpenGl`, `GlExt`, VBO broker) builds on macOS
+and renders into the Os game window. On an M4 it reports `2.1 Metal - 90.5` and picks `arbvp1` / `arbfp1`, the shader
+path the original Mac client used. Notes:
+
+- GlExt keeps its extension pointer variables. On Mac, `CGxDeviceOpenGL/Mac/GlMac.h` renames them (Apple declares
+  those names as functions) and `wglGetProcAddress` uses `dlsym` on OpenGL.framework, so `BindGlExtensions` runs
+  unchanged. NV register combiners and NV vertex programs stay null.
+- 26 Win32/WGL functions in `CGxDeviceOpenGl.cpp` are wrapped in `#if defined(_WIN32)` (bodies untouched). Their
+  Mac versions are in `Mac/CGxDeviceOpenGlMac.inl`, included at the end of the file so they share its statics.
+  `wglMakeCurrent` / `wglSwapLayerBuffers` map onto NSOpenGLContext, so render-target copy and `ScenePresent` stay
+  shared.
+- The context is NSOpenGLContext on the legacy 2.1 profile, at 1x (points, matching Os coordinates). The window
+  listener in `OsMacWindow.h` delivers resize, minimize and focus to `DeviceWM`, as `WindowProcGl` does on
+  Windows. There are no pbuffers, so render targets use the FBO or copy paths. Gamma goes through
+  `CGSetDisplayTransferByTable` in fullscreen only. Fullscreen is a borderless window at desktop resolution (no
+  mode switching).
+- `Gx/CGxDevice/Mac`: desktop and monitor modes from CGDisplay, adapter class 3, and D3D factories that return
+  nullptr. `GxDefaultApi` / `GxApiSupported` are OpenGL-only on Mac.
+- `Tools/GxDrawTest` (Mac only) creates the device with `CreateGxDevice(GxApi_OpenGl, OsWindowProc, ...)` and
+  draws a triangle. `--self-test` reads the back buffer and checks clear color, triangle, shader targets and resize,
+  and passes.
+- Not exercised yet: game shaders and textures (they need the MPQs, which need the full client), fullscreen,
+  Retina 2x rendering, multisampling.
+- Undefined symbols at link: 114 -> 106 (FMOD, Net, LCD stubs, Warden/BotCheck, Battlenet/ComSat, movie, `main`).
+
 Later option, out of scope for the first playable build: a Metal backend, or D3D9 through a translation
 layer. Apple may drop OpenGL at some point.
 

@@ -3,8 +3,13 @@
 
 #include <cstddef>
 #include <cstdint>
+#if defined(_WIN32)
 #include <windows.h>
 #include <GL/gl.h>
+#else
+#define GL_SILENCE_DEPRECATION 1
+#include <OpenGL/gl.h>
+#endif
 
 #define GL_TEXTURE0_ARB 0x84C0
 #define GL_MAX_TEXTURE_UNITS_ARB 0x84E2
@@ -111,7 +116,14 @@
 #define WGL_SAMPLE_BUFFERS_ARB 0x2041
 #define WGL_SAMPLES_ARB 0x2042
 
+#if defined(_WIN32)
 DECLARE_HANDLE(HPBUFFERARB);
+#else
+typedef void* HDC;
+typedef void* HGLRC;
+typedef void* HPBUFFERARB;
+typedef float FLOAT;
+#endif
 
 typedef char GLcharARB;
 typedef ptrdiff_t GLintptrARB;
@@ -187,6 +199,10 @@ typedef void (APIENTRY* PFNGLDELETEPROGRAMSNVPROC)(GLsizei n, const GLuint* prog
 typedef void (APIENTRY* PFNGLPROGRAMPARAMETERS4FVNVPROC)(GLenum target, GLuint index, GLsizei count, const GLfloat* params);
 typedef void (APIENTRY* PFNGLBINDPROGRAMNVPROC)(GLenum target, GLuint id);
 typedef void (APIENTRY* PFNGLLOADPROGRAMNVPROC)(GLenum target, GLuint id, GLsizei len, const GLubyte* program);
+
+#if !defined(_WIN32)
+#include "Engine/Source/Gx/CGxDeviceOpenGL/Mac/GlMac.h"
+#endif
 
 extern int32_t glExtGPUProgramParameters;
 extern PFNGLPROGRAMLOCALPARAMETERS4FVEXTPROC glProgramLocalParameters4fvEXT;
