@@ -7,6 +7,10 @@ if (WIN32)
     set(WOWDECOMP_PLATFORM_WIN 1)
 elseif (APPLE)
     set(WOWDECOMP_PLATFORM_MAC 1)
+    # AppKit glue (windows, events, dialogs, clipboard) is Objective-C++ in .mm files.
+    enable_language(OBJCXX)
+    set(CMAKE_OBJCXX_STANDARD 17)
+    set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
 else ()
     message(FATAL_ERROR "wowdecomp targets Windows and macOS only.")
 endif ()
@@ -61,6 +65,7 @@ macro (wowdecomp_mac_compile_options)
         -Wno-deprecated-declarations
         # jpeg and lua are C built as C++ and use `register`.
         $<$<COMPILE_LANGUAGE:CXX>:-Wno-register>
+        $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>
     )
     # Stand-ins for MSVC CRT headers that macOS lacks (<malloc.h>).
     include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/Engine/Source/Base/Compat/Mac)

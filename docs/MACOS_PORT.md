@@ -188,6 +188,28 @@ Version, Unicode, URL (system libcurl), iounit, plus Storm SErr, SLog, SReg (CFP
 - Undefined symbols at link: 286 -> 225. What's left is Os, the FMOD platform layer, Net, LCD stubs,
   Warden/BotCheck, Gx, Battlenet/ComSat, the movie decoder and `main`.
 
+**Status: Os done.** Every Os function the client uses has a Mac version (`Engine/Source/Os/Mac/`). The window and
+input layer is AppKit (`Input.mm`, `Gui.mm`, `OsClipboard.mm`). `OsMacWindow.h` is the Mac-only entry point the Gx
+device will use to create the game window and get its view. Notes:
+
+- The game view turns AppKit events into the same OSINPUT events `OsWindowProc` makes from window messages:
+  keys from hardware key codes plus the keyboard layout (like `MapVirtualKey`), text through `NSTextInputClient`,
+  left/right modifiers, mouse, wheel (120 per notch), relative mouse via
+  `CGAssociateMouseAndMouseCursorPosition`, focus, live resize and close. `OsInputGet` drains AppKit events
+  without blocking, as Windows drains `PeekMessage`.
+- Coordinates and sizes are points (top-left origin). On Retina screens the GL drawable can be twice that; Phase 3
+  picks the backing scale.
+- `Win64/OsFile.cpp` builds on Mac as is (only Win32 constants, from `Mac/Win32Files.h`).
+- `OsGetOsId` / `OsGetProcessorId` still report `'Win'` / `'x86'` in the login challenge, because the client speaks
+  the Windows protocol. That also means servers send Windows (x86) Warden modules, which can't run on arm64.
+  Playing needs a server with Warden off for this client, or a Warden replacement.
+- Not done yet: CJK composition/candidate UI (dead keys work), gamepads (GameController), and a decision on the
+  Command key (it isn't a game key; Cmd+Q asks the game to close).
+- `Tools/OsWindowTest` (Mac only) opens the game window and prints input events; `--self-test` checks the
+  translation automatically and passes.
+- Undefined symbols at link: 225 -> 114 (FMOD 39, Net 19, LCD 17, Warden/BotCheck 12, Battlenet/ComSat 10,
+  Gx 8, movie 4, `main` and a few odd ones).
+
 SEH (`__try/__except`) in these layers becomes `sigaction`/`setjmp` handlers or plain error checks.
 D3D's SEH stays in the Windows-only backend.
 

@@ -45,7 +45,10 @@
 #endif
 
 // Windows types. Windows is LLP64, so LONG / ULONG / DWORD are 32-bit even though `long` is 64-bit here.
+// Objective-C has its own BOOL; the AppKit glue (.mm) uses that one. Shared code doesn't use the Win32 BOOL.
+#if !defined(__OBJC__)
 typedef int32_t BOOL;
+#endif
 typedef uint8_t BYTE;
 typedef uint16_t WORD;
 typedef uint32_t DWORD;

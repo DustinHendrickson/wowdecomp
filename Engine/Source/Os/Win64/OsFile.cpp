@@ -1,7 +1,11 @@
 #if defined(WOWDECOMP_ARCH_64)
 
 #include <cstdint>
+#if defined(_WIN32)
 #include <windows.h>
+#else
+#include "Engine/Source/Os/Mac/Win32Files.h"
+#endif
 #include "Engine/Source/BlizzardCore/Source/System/File/File.h"
 #include "Engine/Source/BlizzardCore/Source/System/String/Path.h"
 #include "Engine/Source/BlizzardCore/Source/System/String/String.h"
