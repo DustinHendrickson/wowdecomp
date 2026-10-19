@@ -215,6 +215,25 @@ static inline int fopen_s(FILE** stream, const char* name, const char* mode) {
     return *stream ? 0 : errno;
 }
 
+// MSVC's rand: its LCG with RAND_MAX 0x7FFF. Ported code assumes that range (DayNight scales rand() by 1/32767 for the
+// cloud noise, M2 animation variations compare it against 0..0x7FFF frequencies, seeds are built as
+// (rand() << 16) | rand()), where macOS's rand returns 31 bits. One state for the process (MSVC keeps one per thread).
+__attribute__((weak)) unsigned int wowdecomp_rand_state = 1;
+
+static inline int wowdecomp_rand(void) {
+    wowdecomp_rand_state = wowdecomp_rand_state * 214013u + 2531011u;
+    return (int)((wowdecomp_rand_state >> 16) & 0x7FFF);
+}
+
+static inline void wowdecomp_srand(unsigned int seed) {
+    wowdecomp_rand_state = seed;
+}
+
+#undef RAND_MAX
+#define RAND_MAX 0x7FFF
+#define rand() wowdecomp_rand()
+#define srand(seed) wowdecomp_srand(seed)
+
 // MSVC's _cexit runs atexit handlers and flushes streams without ending the process; Storm then calls _exit.
 // POSIX has no way to run atexit handlers alone, so this only flushes. The Mac Storm layer should call exit() instead.
 static inline void _cexit(void) {
