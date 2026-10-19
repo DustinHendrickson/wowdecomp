@@ -90,6 +90,11 @@ void* wglGetProcAddress(const char* name);
 // own context. On Windows the device also draws into its pbuffer through the main context (m_pbufferRC is that
 // context), then copies the pixels into the target texture. wglMakeCurrent with the returned handle as the HDC binds
 // the framebuffer object; with any other HDC it binds the window's. nullptr without EXT_framebuffer_object.
+// glCopyTexImage2D, plus what the FBO render-target path does when it creates a depth texture: depth comparison, so
+// shadow maps copied out of the pbuffer sample through SHADOW2D lookups as on Windows' D3D path.
+void MacGlCopyTexImage2D(GLenum target, GLint level, GLenum internalFormat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border);
+#define glCopyTexImage2D MacGlCopyTexImage2D
+
 HDC MacGlCreatePbuffer(int32_t width, int32_t height);
 void MacGlDestroyPbuffer(HDC pbuffer);
 

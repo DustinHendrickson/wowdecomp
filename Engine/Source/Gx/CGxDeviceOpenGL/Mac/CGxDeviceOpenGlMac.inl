@@ -7,6 +7,7 @@
 // Windows sends WM_SIZE / WM_SETFOCUS to WindowProcGl. The pbuffer behind texture render targets is a framebuffer
 // object (MacGlCreatePbuffer). Fullscreen is a borderless window over the desktop at its current resolution.
 
+#include <algorithm>
 #include "Engine/Source/Gx/CGxDeviceOpenGL/Mac/MacGlContext.h"
 #include "Engine/Source/Os/Mac/OsMacWindow.h"
 
@@ -79,8 +80,12 @@ void CGxDeviceOpenGl::DeviceCreatePbuffer() {
         return;
     }
 
+    // Windows sizes the pbuffer to the window. Targets are drawn into its lower left corner and copied out, so it is at
+    // least as large as the biggest target: 2048 square shadow maps at medium shadow quality.
     const CRect& window = this->DeviceDefWindow();
-    HDC pbuffer = MacGlCreatePbuffer(static_cast<int32_t>(window.maxX - window.minX), static_cast<int32_t>(window.maxY - window.minY));
+    int32_t width = std::max(static_cast<int32_t>(window.maxX - window.minX), 2048);
+    int32_t height = std::max(static_cast<int32_t>(window.maxY - window.minY), 2048);
+    HDC pbuffer = MacGlCreatePbuffer(width, height);
 
     if (!pbuffer) {
         return;
@@ -90,6 +95,10 @@ void CGxDeviceOpenGl::DeviceCreatePbuffer() {
     this->m_pbufferDC = pbuffer;
     this->m_pbufferRC = this->m_hglrc;
     this->m_caps.m_rttFormat[GxTex_Argb8888] = 1;
+
+    // Depth targets for shadow maps: copied out of the pbuffer's depth buffer (MacGlCopyTexImage2D makes them sample with
+    // depth comparison, for SHADOW2D lookups).
+    this->m_caps.m_rttFormat[GxTex_D24X8] = 1;
 }
 
 void CGxDeviceOpenGl::DeviceQueryPbuffer() {

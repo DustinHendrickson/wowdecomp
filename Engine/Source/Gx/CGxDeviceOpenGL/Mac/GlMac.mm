@@ -225,6 +225,18 @@ void DeletePbuffer(MacPbuffer* pbuffer) {
 
 }
 
+#undef glCopyTexImage2D
+
+void MacGlCopyTexImage2D(GLenum target, GLint level, GLenum internalFormat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border) {
+    glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
+
+    if (internalFormat == GL_DEPTH_COMPONENT || internalFormat == GL_DEPTH_COMPONENT16 || internalFormat == GL_DEPTH_COMPONENT24 || internalFormat == GL_DEPTH_COMPONENT32) {
+        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE_ARB, GL_COMPARE_R_TO_TEXTURE_ARB);
+        glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC_ARB, GL_LEQUAL);
+        glTexParameteri(target, GL_DEPTH_TEXTURE_MODE_ARB, GL_LUMINANCE);
+    }
+}
+
 HDC MacGlCreatePbuffer(int32_t width, int32_t height) {
     if (!glExtFramebufferObject || width <= 0 || height <= 0) {
         return nullptr;
