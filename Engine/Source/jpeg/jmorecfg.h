@@ -158,7 +158,9 @@ typedef short INT16;
 /* INT32 must hold at least signed 32-bit values. */
 
 #ifndef XMD_H			/* X11/xmd.h correctly defines INT32 */
-typedef long INT32;
+/* int, not long: long is 64 bits on LP64 (macOS), which doubles tables such as jccolor's rgb_ycc_tab past this
+ * build's 16 KB MAX_ALLOC_CHUNK. Both are 32 bits on Windows. */
+typedef int INT32;
 #endif
 
 /* Datatype used for image dimensions.  The JPEG standard only supports

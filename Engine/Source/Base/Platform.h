@@ -190,6 +190,26 @@ static inline unsigned char _BitScanReverse(uint32_t* index, uint32_t mask) {
 // Single-byte check is right for the UTF-8 and C locales used here.
 #define _ismbcspace(c) isspace(c)
 
+// Shared code hands Windows paths straight to fopen (the screenshot writer's "Screenshots\\WoWScrnShot_*.jpg"), and on
+// macOS the backslash would end up in the file name. Backslashes become slashes, as in the Storm and BlizzardCore file
+// layers. The macro is function-like, so `using ::fopen` and `(fopen)(...)` still name the C library's.
+static inline FILE* wowdecomp_fopen(const char* name, const char* mode) {
+    char path[1024];
+    size_t length = name ? strlen(name) : 0;
+
+    if (!name || !strchr(name, '\\') || length >= sizeof(path)) {
+        return (fopen)(name, mode);
+    }
+
+    for (size_t i = 0; i <= length; i++) {
+        path[i] = name[i] == '\\' ? '/' : name[i];
+    }
+
+    return (fopen)(path, mode);
+}
+
+#define fopen(name, mode) wowdecomp_fopen(name, mode)
+
 static inline int fopen_s(FILE** stream, const char* name, const char* mode) {
     *stream = fopen(name, mode);
     return *stream ? 0 : errno;

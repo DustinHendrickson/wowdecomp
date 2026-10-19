@@ -4,8 +4,8 @@
 //
 // On macOS the device draws into the Os game window (Os/Mac/OsMacWindow.h): m_hwnd is the NSWindow, m_hdc its view,
 // m_hglrc the NSOpenGLContext. The window tells the device about size and focus changes through a listener, where
-// Windows sends WM_SIZE / WM_SETFOCUS to WindowProcGl. There are no pbuffers (wglArbPbuffer stays 0), so render targets
-// take the FBO or copy paths. Fullscreen is a borderless window over the desktop at its current resolution.
+// Windows sends WM_SIZE / WM_SETFOCUS to WindowProcGl. The pbuffer behind texture render targets is a framebuffer
+// object (MacGlCreatePbuffer). Fullscreen is a borderless window over the desktop at its current resolution.
 
 #include "Engine/Source/Gx/CGxDeviceOpenGL/Mac/MacGlContext.h"
 #include "Engine/Source/Os/Mac/OsMacWindow.h"
@@ -63,15 +63,37 @@ void WindowListener(void* param, OsMacWindowEvent event) {
 }
 
 void CGxDeviceOpenGl::DeviceDestroyPbuffer() {
+    if (this->m_pbufferDC && this->m_context) {
+        MacGlDestroyPbuffer(this->m_pbufferDC);
+    }
+
     this->m_pbuffer = nullptr;
     this->m_pbufferDC = nullptr;
     this->m_pbufferRC = nullptr;
 }
 
+// Render targets take the copy path (m_renderTargetMode 0): draw into the pbuffer, then copy into the texture. Without
+// a pbuffer, setting a texture target would make no context current and every GL call after it would be lost.
 void CGxDeviceOpenGl::DeviceCreatePbuffer() {
+    if (!this->m_context) {
+        return;
+    }
+
+    const CRect& window = this->DeviceDefWindow();
+    HDC pbuffer = MacGlCreatePbuffer(static_cast<int32_t>(window.maxX - window.minX), static_cast<int32_t>(window.maxY - window.minY));
+
+    if (!pbuffer) {
+        return;
+    }
+
+    this->m_pbuffer = reinterpret_cast<HPBUFFERARB>(pbuffer);
+    this->m_pbufferDC = pbuffer;
+    this->m_pbufferRC = this->m_hglrc;
+    this->m_caps.m_rttFormat[GxTex_Argb8888] = 1;
 }
 
 void CGxDeviceOpenGl::DeviceQueryPbuffer() {
+    // A framebuffer object is never lost, unlike a WGL pbuffer after a display mode change.
 }
 
 void CGxDeviceOpenGl::IDevSetFocus(int32_t focus, const CGxFormat& format) {

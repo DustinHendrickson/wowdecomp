@@ -86,6 +86,13 @@ typedef intptr_t LPARAM;
 // dlsym on OpenGL.framework; nullptr for anything it doesn't export.
 void* wglGetProcAddress(const char* name);
 
+// The Mac stand-in for a WGL pbuffer: a framebuffer object with color and depth/stencil renderbuffers in the device's
+// own context. On Windows the device also draws into its pbuffer through the main context (m_pbufferRC is that
+// context), then copies the pixels into the target texture. wglMakeCurrent with the returned handle as the HDC binds
+// the framebuffer object; with any other HDC it binds the window's. nullptr without EXT_framebuffer_object.
+HDC MacGlCreatePbuffer(int32_t width, int32_t height);
+void MacGlDestroyPbuffer(HDC pbuffer);
+
 HDC wglGetCurrentDC();
 HGLRC wglGetCurrentContext();
 BOOL wglMakeCurrent(HDC dc, HGLRC context);

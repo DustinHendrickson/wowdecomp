@@ -22,8 +22,11 @@
 
 #import <AppKit/AppKit.h>
 #import <Carbon/Carbon.h>
+#include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <cstdint>
+#include <vector>
 #include "Engine/Source/Event/Types.h"
 #include "Engine/Source/Os/Gui.h"
 #include "Engine/Source/Os/Input.h"
@@ -179,6 +182,43 @@ void PutKey(KEY key, bool down) {
     }
 
     OsQueuePut(down ? OS_INPUT_KEY_DOWN : OS_INPUT_KEY_UP, key, 1, 0, 0);
+}
+
+// Debugging aid: WOWDECOMP_SCREENSHOTS="20,45" presses Print Screen (F13) that many seconds after the first input poll,
+// so a run can be checked from the game's own screenshots (Screenshots/) with nobody at the keyboard.
+void PutScheduledScreenshots() {
+    static std::vector<double> s_times;
+    static bool s_parsed;
+    static std::chrono::steady_clock::time_point s_start;
+
+    if (!s_parsed) {
+        s_parsed = true;
+        s_start = std::chrono::steady_clock::now();
+
+        for (const char* times = getenv("WOWDECOMP_SCREENSHOTS"); times && *times;) {
+            char* end;
+            double seconds = strtod(times, &end);
+
+            if (end == times) {
+                break;
+            }
+
+            s_times.push_back(seconds);
+            times = *end == ',' ? end + 1 : end;
+        }
+    }
+
+    if (s_times.empty()) {
+        return;
+    }
+
+    double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - s_start).count();
+
+    if (elapsed >= s_times.front()) {
+        s_times.erase(s_times.begin());
+        OsQueuePut(OS_INPUT_KEY_DOWN, KEY_PRINTSCREEN, 1, 0, 0);
+        OsQueuePut(OS_INPUT_KEY_UP, KEY_PRINTSCREEN, 1, 0, 0);
+    }
 }
 
 MOUSEBUTTON ConvertButton(NSEvent* event) {
@@ -884,6 +924,7 @@ int32_t OsInputGet(OSINPUT* id, int32_t* param0, int32_t* param1, int32_t* param
     }
 
     if (s_queueHead == s_queueTail) {
+        PutScheduledScreenshots();
         OsPollJoysticks(s_appActive);
 
         @autoreleasepool {
