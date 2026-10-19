@@ -118,7 +118,10 @@ void DebugDrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsizei count
         return;
     }
 
-    if (s_reports < 60 && type == GL_UNSIGNED_SHORT && count > 0) {
+    // Reading indices back stalls on the GPU, so only the first draws are checked.
+    static int s_rangeChecks;
+
+    if (s_reports < 60 && s_rangeChecks++ < 3000 && type == GL_UNSIGNED_SHORT && count > 0) {
         uint16_t* data = static_cast<uint16_t*>(malloc(count * sizeof(uint16_t)));
 
         if (buffer) {
@@ -234,6 +237,15 @@ void MacGlCopyTexImage2D(GLenum target, GLint level, GLenum internalFormat, GLin
         glTexParameteri(target, GL_TEXTURE_COMPARE_MODE_ARB, GL_COMPARE_R_TO_TEXTURE_ARB);
         glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC_ARB, GL_LEQUAL);
         glTexParameteri(target, GL_DEPTH_TEXTURE_MODE_ARB, GL_LUMINANCE);
+
+        static int s_reports;
+
+        if (getenv("WOWDECOMP_GLDEBUG") && s_reports < 10) {
+            s_reports++;
+            GLint framebuffer = 0;
+            glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &framebuffer);
+            fprintf(stderr, "GL depth texture copied %dx%d from framebuffer %d at %d,%d, error 0x%x\n", width, height, framebuffer, x, y, glGetError());
+        }
     }
 }
 

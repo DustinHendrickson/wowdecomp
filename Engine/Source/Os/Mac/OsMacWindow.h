@@ -25,6 +25,10 @@ float OsMacGetBackingScale(void* window);
 
 void OsMacDestroyGameWindow(void* window);
 
+// Hides the system cursor over the content area, for a Gx device that draws the game's cursor itself (the OpenGL
+// device always does: it has no hardware cursor). The arrow still shows over the title bar and outside the window.
+void OsMacSetSystemCursorHidden(void* window, bool hidden);
+
 // Content area size in points, and its top-left corner in screen points (origin at the top left of the main screen).
 void OsMacGetContentSize(void* window, int32_t* width, int32_t* height);
 void OsMacGetContentScreenOrigin(void* window, int32_t* x, int32_t* y);

@@ -197,6 +197,10 @@ int32_t CGxDeviceOpenGl::IDevAttachGlContext(const CGxFormat& format) {
         this->ISetCaps(format);
         this->DeviceCreatePbuffer();
         this->ICursorCreate(format);
+
+        // The device draws the game's cursor (ICursorDraw; there is no hardware cursor), so the system one is hidden
+        // over the window, as the Windows window class shows the game's own cursor there.
+        OsMacSetSystemCursorHidden(this->m_hwnd, true);
         this->IStateSetContextDefaults();
         this->IRsSync(1);
         this->IShaderConstantsClear();

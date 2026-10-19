@@ -317,6 +317,27 @@ void ApplyMouseLock() {
     double m_relativeX;
     double m_relativeY;
     NSTimer* m_pollTimer;
+    BOOL m_hideCursor;
+}
+
+// The game draws its own cursor, so over the content area the system cursor is a transparent one. AppKit puts the
+// arrow back over the title bar, outside the window and while another app is active.
+- (void)setHideCursor:(BOOL)hide {
+    m_hideCursor = hide;
+    [self.window invalidateCursorRectsForView:self];
+}
+
+- (void)resetCursorRects {
+    if (!m_hideCursor) {
+        [super resetCursorRects];
+        return;
+    }
+
+    static NSCursor* s_invisible = [[NSCursor alloc] initWithImage:[NSImage imageWithSize:NSMakeSize(16, 16) flipped:NO drawingHandler:^BOOL(NSRect rect) {
+        return YES;
+    }] hotSpot:NSZeroPoint];
+
+    [self addCursorRect:self.bounds cursor:s_invisible];
 }
 
 - (BOOL)isFlipped {
@@ -756,6 +777,10 @@ void OsMacDestroyGameWindow(void* window) {
     NSWindow* object = (__bridge_transfer NSWindow*)window;
     object.delegate = nil;
     [object close];
+}
+
+void OsMacSetSystemCursorHidden(void* window, bool hidden) {
+    [(WowGameView*)((__bridge NSWindow*)window).contentView setHideCursor:hidden];
 }
 
 void OsMacGetContentSize(void* window, int32_t* width, int32_t* height) {

@@ -317,8 +317,17 @@ layer. Apple may drop OpenGL at some point.
 - The login scene renders correctly on the shader path. Checked from the game's own screenshots, with
   `WOWDECOMP_SCREENSHOTS="15,25"` pressing Print Screen at those seconds; `WOWDECOMP_GLDEBUG=1` reports rejected
   ARB programs, GL errors, bad draw ranges and context-less buffer calls.
-- Open: in-world rendering after the fixes, one earlier in-world crash that left no log, Warden on servers that
-  enforce it, movies (DivX stub), and Retina 2x rendering.
+- In the world (checked from the user's screenshots in Goldshire): terrain, doodads, characters, sky and clouds render
+  correctly at about 120 FPS on an M4, and low and medium shadows work.
+  - `rand`/`srand` are MSVC's (`RAND_MAX 0x7FFF`) through `Platform.h`. macOS's 31-bit `rand` broke the procedural
+    cloud texture (`rand() / 32767` noise), M2 animation repeat counts and `(rand() << 16) | rand()` seeds.
+  - Shadows: `ValidateShadowMode` allowed low and medium only on D3D9 and the Mac client's GLL renderer. On macOS the
+    OpenGL device counts as GLL; the pbuffer is at least 2048 square and reports `D24X8` targets, and depth textures
+    copied out of it get depth comparison for `SHADOW2D` lookups. High and above stay D3D only, as in the original
+    Mac client.
+  - The system cursor is hidden over the game view (the GL device draws the game's cursor itself).
+- Open: one earlier in-world crash that left no log, Warden on servers that enforce it, movies (DivX stub), and
+  Retina 2x rendering.
 
 ## Rules of the road
 
