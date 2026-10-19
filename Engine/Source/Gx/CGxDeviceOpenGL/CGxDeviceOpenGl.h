@@ -134,6 +134,14 @@ class CGxDeviceOpenGl : public CGxDevice {
     virtual void DeviceUnk82();
     virtual void DeviceUnk83(uint32_t a, uint32_t b);
 
+#if defined(WOWDECOMP_PLATFORM_MAC)
+    // macOS hardware cursor: the game's cursor image becomes the system cursor over the window (Mac/
+    // CGxDeviceOpenGlMac.inl). Windows' OpenGL device only has the software cursor.
+    virtual void CursorSetVisible(int32_t visible);
+    virtual void CursorUnlock(uint32_t x, uint32_t y);
+    void ApplyMacCursor();
+#endif
+
     static LRESULT CALLBACK WindowProcGl(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
     CGxDeviceOpenGl();

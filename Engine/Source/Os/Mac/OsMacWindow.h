@@ -4,8 +4,10 @@
 // The macOS game window, for the Mac Gx device (Windows' Gx devices create their own HWND with CreateWindowEx).
 //
 // The window is an NSWindow whose content view feeds keyboard, text, mouse, focus, size and close events into the Os
-// input queue, producing the same OSINPUT events OsWindowProc makes from window messages on Windows. Coordinates are in
-// points with the origin at the top left of the content area, like a Win32 client area. All calls are main-thread only.
+// input queue, producing the same OSINPUT events OsWindowProc makes from window messages on Windows. Positions and sizes
+// are render pixels with the origin at the top left of the content area, like a Win32 client area: backing pixels with
+// Retina rendering (two per point on a Retina display), points without it (WOWDECOMP_RETINA=0 or the Retina user
+// default). All calls are main-thread only.
 
 #include <cstdint>
 
@@ -13,8 +15,8 @@
 // it directly only to show dialogs before any window exists.
 void OsMacInitializeApplication();
 
-// Creates and shows the game window with a content area of width x height points, at (x, y) from the top left of the
-// main screen, or centered when x or y is negative. Returns the NSWindow as an opaque handle, or nullptr.
+// Creates and shows the game window with a content area of width x height render pixels, at (x, y) from the top left of
+// the main screen, or centered when x or y is negative. Returns the NSWindow as an opaque handle, or nullptr.
 void* OsMacCreateGameWindow(const char* title, int32_t x, int32_t y, int32_t width, int32_t height);
 
 // The window's content view (NSView), which a GL context or Metal layer attaches to.
@@ -23,18 +25,26 @@ void* OsMacGetGameView(void* window);
 // Pixels per point of the window's screen (2 on Retina displays).
 float OsMacGetBackingScale(void* window);
 
+// Render pixels per point: the backing scale with Retina rendering, otherwise 1. A null window means the main screen.
+float OsMacGetRenderScale(void* window);
+
 void OsMacDestroyGameWindow(void* window);
 
 // Hides the system cursor over the content area, for a Gx device that draws the game's cursor itself (the OpenGL
 // device always does: it has no hardware cursor). The arrow still shows over the title bar and outside the window.
 void OsMacSetSystemCursorHidden(void* window, bool hidden);
 
-// Content area size in points, and its top-left corner in screen points (origin at the top left of the main screen).
+// The game's cursor as the system cursor over the content area (a hardware cursor): 32x32 ARGB pixels (0xAARRGGBB, as
+// the Gx device keeps them) with the hotspot in those pixels, shown 32 points across. nullptr hides the cursor there.
+void OsMacSetGameCursor(void* window, const uint32_t* pixels, int32_t hotspotX, int32_t hotspotY);
+
+// Content area size in render pixels, and its top-left corner in screen render pixels (origin at the top left of the main
+// screen).
 void OsMacGetContentSize(void* window, int32_t* width, int32_t* height);
 void OsMacGetContentScreenOrigin(void* window, int32_t* x, int32_t* y);
 
 // Fullscreen is a borderless window covering the screen with the menu bar and Dock hidden; the display mode isn't
-// changed. Windowed restores the title bar with a content area of width x height points.
+// changed. Windowed restores the title bar with a content area of width x height render pixels.
 void OsMacSetWindowFullscreen(void* window, bool fullscreen, int32_t width, int32_t height);
 
 // Window events for the Gx device, the part of the window's life Windows reports to the device's own window procedure

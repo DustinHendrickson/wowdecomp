@@ -165,6 +165,28 @@ void CGxDeviceOpenGl::DeviceDestroy() {
     s_deviceChanging = 0;
 }
 
+void CGxDeviceOpenGl::ApplyMacCursor() {
+    if (!this->m_hwnd) {
+        return;
+    }
+
+    if (this->m_hwCursor) {
+        OsMacSetGameCursor(this->m_hwnd, this->m_cursorVisible ? this->m_cursor : nullptr, this->m_cursorHotspotX, this->m_cursorHotspotY);
+    } else {
+        OsMacSetSystemCursorHidden(this->m_hwnd, true);
+    }
+}
+
+void CGxDeviceOpenGl::CursorSetVisible(int32_t visible) {
+    CGxDevice::CursorSetVisible(visible);
+    this->ApplyMacCursor();
+}
+
+void CGxDeviceOpenGl::CursorUnlock(uint32_t x, uint32_t y) {
+    CGxDevice::CursorUnlock(x, y);
+    this->ApplyMacCursor();
+}
+
 void CGxDeviceOpenGl::DeviceSetGamma(float gamma) {
     CGxDevice::DeviceSetGamma(gamma);
 
@@ -196,11 +218,12 @@ int32_t CGxDeviceOpenGl::IDevAttachGlContext(const CGxFormat& format) {
 
         this->ISetCaps(format);
         this->DeviceCreatePbuffer();
-        this->ICursorCreate(format);
 
-        // The device draws the game's cursor (ICursorDraw; there is no hardware cursor), so the system one is hidden
-        // over the window, as the Windows window class shows the game's own cursor there.
-        OsMacSetSystemCursorHidden(this->m_hwnd, true);
+        // The system cursor shows the game's cursor (CursorUnlock), at its usual size whatever the render scale.
+        // gxCursor 0 keeps the device's software cursor, with the system one hidden over the window.
+        this->m_caps.m_hwCursor = 1;
+        this->ICursorCreate(format);
+        this->ApplyMacCursor();
         this->IStateSetContextDefaults();
         this->IRsSync(1);
         this->IShaderConstantsClear();

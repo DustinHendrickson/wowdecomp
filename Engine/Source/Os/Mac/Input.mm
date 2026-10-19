@@ -13,7 +13,8 @@
 //   SIZE                       width, height (from OsInputGet, like Windows)
 //   CLOSE, CAPTURE_CHANGED     -, x, y
 //
-// OsQueuePut stamps the time into the last parameter. Positions are content-area points, top left origin.
+// OsQueuePut stamps the time into the last parameter. Positions and sizes are content-area render pixels, top left
+// origin: backing pixels with Retina rendering (2 per point on a Retina display), points without it (see RenderScale).
 //
 // Keys map from hardware key codes: special keys through a table, character keys through the current keyboard layout
 // (UCKeyTranslate with no modifiers), which is what MapVirtualKey gives Windows: letters as upper case, punctuation
@@ -65,6 +66,54 @@ WowGameView* GameView() {
 NSPoint ViewPoint(NSView* view, NSPoint windowPoint) {
     // The view is flipped, so this is already top-left based.
     return [view convertPoint:windowPoint fromView:nil];
+}
+
+// Retina rendering: the game draws at the display's backing resolution and sees its window, mouse and monitor modes in
+// those pixels, as on a high-resolution Windows monitor. WOWDECOMP_RETINA=0, or the user default Retina set to NO
+// (defaults write org.wowdecomp.wow Retina -bool NO, or the WowClient domain), keeps everything at one pixel per point.
+bool RetinaEnabled() {
+    static int s_enabled = -1;
+
+    if (s_enabled < 0) {
+        const char* env = getenv("WOWDECOMP_RETINA");
+
+        if (env && *env) {
+            s_enabled = strcmp(env, "0") != 0;
+        } else {
+            NSNumber* value = [NSUserDefaults.standardUserDefaults objectForKey:@"Retina"];
+            s_enabled = value ? value.boolValue : 1;
+        }
+    }
+
+    return s_enabled;
+}
+
+// Render pixels per point for a window, or for the main screen before there is one.
+CGFloat RenderScale(NSWindow* window) {
+    if (!RetinaEnabled()) {
+        return 1.0;
+    }
+
+    return window ? window.backingScaleFactor : NSScreen.mainScreen.backingScaleFactor;
+}
+
+// A window point as content-area render pixels.
+C2iVector ViewPixel(NSView* view, NSPoint windowPoint) {
+    NSPoint point = ViewPoint(view, windowPoint);
+    CGFloat scale = RenderScale(view.window);
+    C2iVector result;
+    result.x = static_cast<int32_t>(std::floor(point.x * scale));
+    result.y = static_cast<int32_t>(std::floor(point.y * scale));
+    return result;
+}
+
+C2iVector ContentPixels(NSWindow* window) {
+    NSSize size = window.contentView.bounds.size;
+    CGFloat scale = RenderScale(window);
+    C2iVector result;
+    result.x = static_cast<int32_t>(std::lround(size.width * scale));
+    result.y = static_cast<int32_t>(std::lround(size.height * scale));
+    return result;
 }
 
 int32_t SpecialKey(uint16_t keyCode, KEY* key) {
@@ -251,14 +300,16 @@ void SaveMouse(const C2iVector& point) {
     s_mousePos = point;
 }
 
-void WarpToViewPoint(NSView* view, NSPoint point) {
+// Moves the cursor to a content-area position in render pixels.
+void WarpToViewPixel(NSView* view, int32_t x, int32_t y) {
     NSWindow* window = view.window;
 
     if (!window) {
         return;
     }
 
-    NSPoint windowPoint = [view convertPoint:point toView:nil];
+    CGFloat scale = RenderScale(window);
+    NSPoint windowPoint = [view convertPoint:NSMakePoint(x / scale, y / scale) toView:nil];
     NSPoint screenPoint = [window convertPointToScreen:windowPoint];
 
     // Quartz display coordinates put the origin at the top left of the main screen.
@@ -317,27 +368,31 @@ void ApplyMouseLock() {
     double m_relativeX;
     double m_relativeY;
     NSTimer* m_pollTimer;
-    BOOL m_hideCursor;
+    NSCursor* m_contentCursor;
 }
 
-// The game draws its own cursor, so over the content area the system cursor is a transparent one. AppKit puts the
-// arrow back over the title bar, outside the window and while another app is active.
-- (void)setHideCursor:(BOOL)hide {
-    m_hideCursor = hide;
+// The cursor over the content area: the game's (a hardware cursor), a transparent one while the game draws its own or
+// hides it, or nil for the system arrow. AppKit shows the arrow over the title bar, outside the window and in other
+// apps.
+- (void)setContentCursor:(NSCursor*)cursor {
+    m_contentCursor = cursor;
     [self.window invalidateCursorRectsForView:self];
+
+    // Cursor rects only change the cursor when the mouse next moves; apply it now if the mouse is over the content.
+    NSPoint point = ViewPoint(self, self.window.mouseLocationOutsideOfEventStream);
+
+    if (self.window.isKeyWindow && NSPointInRect(point, self.bounds)) {
+        [(cursor ? cursor : NSCursor.arrowCursor) set];
+    }
 }
 
 - (void)resetCursorRects {
-    if (!m_hideCursor) {
+    if (!m_contentCursor) {
         [super resetCursorRects];
         return;
     }
 
-    static NSCursor* s_invisible = [[NSCursor alloc] initWithImage:[NSImage imageWithSize:NSMakeSize(16, 16) flipped:NO drawingHandler:^BOOL(NSRect rect) {
-        return YES;
-    }] hotSpot:NSZeroPoint];
-
-    [self addCursorRect:self.bounds cursor:s_invisible];
+    [self addCursorRect:self.bounds cursor:m_contentCursor];
 }
 
 - (BOOL)isFlipped {
@@ -357,11 +412,7 @@ void ApplyMouseLock() {
         return s_mousePos;
     }
 
-    NSPoint point = ViewPoint(self, event.locationInWindow);
-    C2iVector result;
-    result.x = static_cast<int32_t>(std::floor(point.x));
-    result.y = static_cast<int32_t>(std::floor(point.y));
-    return result;
+    return ViewPixel(self, event.locationInWindow);
 }
 
 // Keyboard
@@ -608,7 +659,9 @@ void ApplyMouseLock() {
 }
 
 - (void)windowDidChangeBackingProperties:(NSNotification*)notification {
+    // Moving to a screen with another scale changes the window's size in render pixels.
     s_windowSize = 1;
+    [self notify:OsMacWindowEvent_Resized];
 }
 
 - (void)setActive:(int32_t)active {
@@ -617,8 +670,8 @@ void ApplyMouseLock() {
     if (!active && s_osButtonState) {
         // Losing the window mid-drag ends the capture, as WM_CAPTURECHANGED does.
         s_osButtonState = 0;
-        NSPoint point = ViewPoint(self, self.window.mouseLocationOutsideOfEventStream);
-        OsQueuePut(OS_INPUT_CAPTURE_CHANGED, 0, static_cast<int32_t>(point.x), static_cast<int32_t>(point.y), 0);
+        C2iVector point = ViewPixel(self, self.window.mouseLocationOutsideOfEventStream);
+        OsQueuePut(OS_INPUT_CAPTURE_CHANGED, 0, point.x, point.y, 0);
     }
 
     s_osButtonState = 0;
@@ -720,7 +773,8 @@ void* OsMacCreateGameWindow(const char* title, int32_t x, int32_t y, int32_t wid
     OsMacInitializeApplication();
 
     @autoreleasepool {
-        NSRect content = NSMakeRect(0, 0, width, height);
+        CGFloat scale = RenderScale(nil);
+        NSRect content = NSMakeRect(0, 0, width / scale, height / scale);
         NSWindowStyleMask style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
         NSWindow* window = [[WowGameWindow alloc] initWithContentRect:content styleMask:style backing:NSBackingStoreBuffered defer:NO];
 
@@ -745,7 +799,7 @@ void* OsMacCreateGameWindow(const char* title, int32_t x, int32_t y, int32_t wid
             [window center];
         } else {
             NSRect screen = NSScreen.mainScreen.frame;
-            [window setFrameTopLeftPoint:NSMakePoint(screen.origin.x + x, screen.origin.y + screen.size.height - y)];
+            [window setFrameTopLeftPoint:NSMakePoint(screen.origin.x + x / scale, screen.origin.y + screen.size.height - y / scale)];
         }
 
         [window makeKeyAndOrderFront:nil];
@@ -779,22 +833,66 @@ void OsMacDestroyGameWindow(void* window) {
     [object close];
 }
 
+namespace {
+
+NSCursor* InvisibleCursor() {
+    static NSCursor* s_cursor = [[NSCursor alloc] initWithImage:[NSImage imageWithSize:NSMakeSize(16, 16) flipped:NO drawingHandler:^BOOL(NSRect rect) {
+        return YES;
+    }] hotSpot:NSZeroPoint];
+
+    return s_cursor;
+}
+
+}
+
 void OsMacSetSystemCursorHidden(void* window, bool hidden) {
-    [(WowGameView*)((__bridge NSWindow*)window).contentView setHideCursor:hidden];
+    [(WowGameView*)((__bridge NSWindow*)window).contentView setContentCursor:hidden ? InvisibleCursor() : nil];
+}
+
+void OsMacSetGameCursor(void* window, const uint32_t* pixels, int32_t hotspotX, int32_t hotspotY) {
+    WowGameView* view = (WowGameView*)((__bridge NSWindow*)window).contentView;
+
+    if (!pixels) {
+        [view setContentCursor:InvisibleCursor()];
+        return;
+    }
+
+    @autoreleasepool {
+        // 32x32 ARGB (0xAARRGGBB) to non-premultiplied RGBA. Shown as 32 points, the size the game draws it at 1x.
+        NSBitmapImageRep* rep = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:nullptr pixelsWide:32 pixelsHigh:32 bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO colorSpaceName:NSDeviceRGBColorSpace bitmapFormat:NSBitmapFormatAlphaNonpremultiplied bytesPerRow:32 * 4 bitsPerPixel:32];
+        uint8_t* bytes = rep.bitmapData;
+
+        for (int32_t i = 0; i < 32 * 32; i++) {
+            uint32_t argb = pixels[i];
+            bytes[i * 4 + 0] = static_cast<uint8_t>(argb >> 16);
+            bytes[i * 4 + 1] = static_cast<uint8_t>(argb >> 8);
+            bytes[i * 4 + 2] = static_cast<uint8_t>(argb);
+            bytes[i * 4 + 3] = static_cast<uint8_t>(argb >> 24);
+        }
+
+        NSImage* image = [[NSImage alloc] initWithSize:NSMakeSize(32, 32)];
+        [image addRepresentation:rep];
+        [view setContentCursor:[[NSCursor alloc] initWithImage:image hotSpot:NSMakePoint(hotspotX, hotspotY)]];
+    }
 }
 
 void OsMacGetContentSize(void* window, int32_t* width, int32_t* height) {
-    NSSize size = ((__bridge NSWindow*)window).contentView.bounds.size;
-    *width = static_cast<int32_t>(size.width);
-    *height = static_cast<int32_t>(size.height);
+    C2iVector size = ContentPixels((__bridge NSWindow*)window);
+    *width = size.x;
+    *height = size.y;
+}
+
+float OsMacGetRenderScale(void* window) {
+    return static_cast<float>(RenderScale((__bridge NSWindow*)window));
 }
 
 void OsMacGetContentScreenOrigin(void* window, int32_t* x, int32_t* y) {
     NSWindow* object = (__bridge NSWindow*)window;
     NSRect content = [object convertRectToScreen:[object.contentView convertRect:object.contentView.bounds toView:nil]];
     CGFloat mainHeight = NSScreen.screens.firstObject.frame.size.height;
-    *x = static_cast<int32_t>(content.origin.x);
-    *y = static_cast<int32_t>(mainHeight - (content.origin.y + content.size.height));
+    CGFloat scale = RenderScale(object);
+    *x = static_cast<int32_t>(content.origin.x * scale);
+    *y = static_cast<int32_t>((mainHeight - (content.origin.y + content.size.height)) * scale);
 }
 
 void OsMacSetWindowFullscreen(void* window, bool fullscreen, int32_t width, int32_t height) {
@@ -809,7 +907,8 @@ void OsMacSetWindowFullscreen(void* window, bool fullscreen, int32_t width, int3
     } else {
         NSApp.presentationOptions = NSApplicationPresentationDefault;
         object.styleMask = view.windowedStyle;
-        [object setContentSize:NSMakeSize(width, height)];
+        CGFloat scale = RenderScale(object);
+        [object setContentSize:NSMakeSize(width / scale, height / scale)];
         [object center];
     }
 
@@ -928,9 +1027,9 @@ int32_t OsInputGet(OSINPUT* id, int32_t* param0, int32_t* param1, int32_t* param
     if (s_windowSize && window && !window.miniaturized) {
         s_windowSize = 0;
 
-        NSSize size = window.contentView.bounds.size;
-        int32_t width = static_cast<int32_t>(size.width);
-        int32_t height = static_cast<int32_t>(size.height);
+        C2iVector size = ContentPixels(window);
+        int32_t width = size.x;
+        int32_t height = size.y;
 
         if (width != s_defaultWindowRect.right || height != s_defaultWindowRect.bottom) {
             s_defaultWindowRect.left = 0;
@@ -984,11 +1083,7 @@ void OsInputSetMouseMode(OS_MOUSE_MODE mode) {
 
     if (mode == OS_MOUSE_MODE_RELATIVE) {
         if (view) {
-            NSPoint point = ViewPoint(view, view.window.mouseLocationOutsideOfEventStream);
-            C2iVector saved;
-            saved.x = static_cast<int32_t>(point.x);
-            saved.y = static_cast<int32_t>(point.y);
-            SaveMouse(saved);
+            SaveMouse(ViewPixel(view, view.window.mouseLocationOutsideOfEventStream));
         }
 
         s_osMouseMode = mode;
@@ -997,7 +1092,7 @@ void OsInputSetMouseMode(OS_MOUSE_MODE mode) {
 
         // Put the cursor back where relative mode started, as RestoreMouse does.
         if (view) {
-            WarpToViewPoint(view, NSMakePoint(s_mousePos.x, s_mousePos.y));
+            WarpToViewPixel(view, s_mousePos.x, s_mousePos.y);
         }
     }
 
@@ -1014,9 +1109,7 @@ void OsInputGetMousePosition(int32_t* x, int32_t* y) {
     C2iVector point = { 0, 0 };
 
     if (view) {
-        NSPoint location = ViewPoint(view, view.window.mouseLocationOutsideOfEventStream);
-        point.x = static_cast<int32_t>(location.x);
-        point.y = static_cast<int32_t>(location.y);
+        point = ViewPixel(view, view.window.mouseLocationOutsideOfEventStream);
     }
 
     SaveMouse(point);
@@ -1039,7 +1132,7 @@ void OsInputSetMousePosition(int32_t x, int32_t y) {
     WowGameView* view = GameView();
 
     if (view && s_osMouseMode != OS_MOUSE_MODE_RELATIVE) {
-        WarpToViewPoint(view, NSMakePoint(x, y));
+        WarpToViewPixel(view, x, y);
     }
 }
 
@@ -1056,11 +1149,11 @@ int32_t OsGetDefaultWindowRect(tagRECT* rect) {
             return 0;
         }
 
-        NSSize size = window.contentView.bounds.size;
+        C2iVector size = ContentPixels(window);
         s_defaultWindowRect.left = 0;
         s_defaultWindowRect.top = 0;
-        s_defaultWindowRect.right = static_cast<int32_t>(size.width);
-        s_defaultWindowRect.bottom = static_cast<int32_t>(size.height);
+        s_defaultWindowRect.right = size.x;
+        s_defaultWindowRect.bottom = size.y;
     }
 
     *rect = s_defaultWindowRect;

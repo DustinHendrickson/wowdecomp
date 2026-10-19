@@ -82,7 +82,9 @@ int main(int argc, char** argv) {
     NSWindow* window = (__bridge NSWindow*)handle;
     CHECK(window.visible);
     CHECK(OsGuiGetWindow(0) == handle);
-    printf("     backing scale %.1f\n", OsMacGetBackingScale(handle));
+    // Sizes and positions are render pixels: S per point (2 with Retina rendering on a Retina display).
+    int32_t S = static_cast<int32_t>(OsMacGetRenderScale(handle));
+    printf("     backing scale %.1f, render scale %d\n", OsMacGetBackingScale(handle), S);
 
     RECT rect;
     CHECK(OsGetDefaultWindowRect(&rect) && rect.right == 1024 && rect.bottom == 768);
@@ -169,17 +171,17 @@ int main(int argc, char** argv) {
     events = Drain();
     CHECK(!Has(events, OS_INPUT_KEY_DOWN, KEY_C) && !Has(events, OS_INPUT_CHAR, 'c'));
 
-    // Mouse, top-left based content coordinates.
+    // Mouse, top-left based content coordinates (events in points, reported in render pixels).
     [window sendEvent:Mouse(window, NSEventTypeMouseMoved, NSMakePoint(200, 100))];
     [window sendEvent:Mouse(window, NSEventTypeLeftMouseDown, NSMakePoint(200, 100))];
     [window sendEvent:Mouse(window, NSEventTypeLeftMouseUp, NSMakePoint(210, 120))];
-    [window sendEvent:Mouse(window, NSEventTypeRightMouseDown, NSMakePoint(300, 400))];
-    [window sendEvent:Mouse(window, NSEventTypeRightMouseUp, NSMakePoint(300, 400))];
+    [window sendEvent:Mouse(window, NSEventTypeRightMouseDown, NSMakePoint(300, 300))];
+    [window sendEvent:Mouse(window, NSEventTypeRightMouseUp, NSMakePoint(300, 300))];
     events = Drain();
-    CHECK(Has(events, OS_INPUT_MOUSE_MOVE, 0, 200, 100));
-    CHECK(Has(events, OS_INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 200, 100));
-    CHECK(Has(events, OS_INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 210, 120));
-    CHECK(Has(events, OS_INPUT_MOUSE_DOWN, MOUSE_BUTTON_RIGHT, 300, 400) && Has(events, OS_INPUT_MOUSE_UP, MOUSE_BUTTON_RIGHT, 300, 400));
+    CHECK(Has(events, OS_INPUT_MOUSE_MOVE, 0, 200 * S, 100 * S));
+    CHECK(Has(events, OS_INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 200 * S, 100 * S));
+    CHECK(Has(events, OS_INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 210 * S, 120 * S));
+    CHECK(Has(events, OS_INPUT_MOUSE_DOWN, MOUSE_BUTTON_RIGHT, 300 * S, 300 * S) && Has(events, OS_INPUT_MOUSE_UP, MOUSE_BUTTON_RIGHT, 300 * S, 300 * S));
 
     // Wheel: one notch up is +120.
     CGEventRef scroll = CGEventCreateScrollWheelEvent(nullptr, kCGScrollEventUnitLine, 1, 1);
@@ -197,8 +199,8 @@ int main(int argc, char** argv) {
     // Resize: reported once through OsInputGet.
     [window setContentSize:NSMakeSize(800, 600)];
     events = Drain();
-    CHECK(Has(events, OS_INPUT_SIZE, 800, 600));
-    CHECK(OsGetDefaultWindowRect(&rect) && rect.right == 800 && rect.bottom == 600);
+    CHECK(Has(events, OS_INPUT_SIZE, 800 * S, 600 * S));
+    CHECK(OsGetDefaultWindowRect(&rect) && rect.right == 800 * S && rect.bottom == 600 * S);
 
     // Close asks the game instead of closing.
     [window performClose:nil];

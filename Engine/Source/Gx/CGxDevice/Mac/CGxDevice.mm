@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include "Engine/Source/Gx/CGxDevice/CGxDevice.h"
 #include "Engine/Source/Gx/Gx.h"
+#include "Engine/Source/Os/Mac/OsMacWindow.h"
 
 namespace {
 
@@ -83,9 +84,10 @@ int32_t CGxDevice::AdapterDesktopMode(CGxMonitorMode& mode) {
         return 0;
     }
 
-    // Points, matching the window sizes the Os layer reports.
-    mode.m_size.x = static_cast<int32_t>(CGDisplayModeGetWidth(current));
-    mode.m_size.y = static_cast<int32_t>(CGDisplayModeGetHeight(current));
+    // Render pixels, matching the window sizes the Os layer reports: the desktop's points times the render scale.
+    float scale = OsMacGetRenderScale(nullptr);
+    mode.m_size.x = static_cast<int32_t>(CGDisplayModeGetWidth(current) * scale);
+    mode.m_size.y = static_cast<int32_t>(CGDisplayModeGetHeight(current) * scale);
     mode.m_refreshRate = RefreshRate(current);
     mode.m_bpp = 32;
     CGDisplayModeRelease(current);
@@ -95,14 +97,14 @@ int32_t CGxDevice::AdapterDesktopMode(CGxMonitorMode& mode) {
 
 int32_t CGxDevice::AdapterMonitorModes(TSGrowableArray<CGxMonitorMode>& modes) {
     // macOS never switches display modes for the game: fullscreen is a borderless window covering the desktop, and a
-    // window is sized in points. So the modes the game chooses from (gxResolution, the video options) are window sizes
-    // in points that fit the desktop: the usual 4:3 and widescreen sizes plus the desktop itself, at each refresh rate
-    // the display offers. The display's own mode list is in pixels and lacks sizes like 1024x768 that the default
+    // window is sized in render pixels. So the modes the game chooses from (gxResolution, the video options) are window
+    // sizes in render pixels that fit the desktop: the usual 4:3 and widescreen sizes plus the desktop itself, at each
+    // refresh rate the display offers. The display's own mode list is in pixels and lacks sizes like 1024x768 that the default
     // settings and the resolution check expect.
     static const C2iVector s_sizes[] = {
         { 640, 480 }, { 800, 600 }, { 1024, 768 }, { 1152, 864 }, { 1280, 720 }, { 1280, 800 }, { 1280, 960 },
         { 1280, 1024 }, { 1366, 768 }, { 1440, 900 }, { 1600, 900 }, { 1600, 1200 }, { 1680, 1050 }, { 1920, 1080 },
-        { 1920, 1200 }, { 2560, 1440 }, { 2560, 1600 },
+        { 1920, 1200 }, { 2560, 1440 }, { 2560, 1600 }, { 2880, 1800 }, { 3840, 2160 },
     };
 
     modes.SetCount(0);
@@ -161,6 +163,13 @@ int32_t CGxDevice::AdapterMonitorModes(TSGrowableArray<CGxMonitorMode>& modes) {
     }
 
     add(desktop.m_size.x, desktop.m_size.y);
+
+    // With Retina rendering, the desktop in points too: one render pixel per point, for a lighter window.
+    float scale = OsMacGetRenderScale(nullptr);
+
+    if (scale > 1.0f) {
+        add(static_cast<int32_t>(desktop.m_size.x / scale), static_cast<int32_t>(desktop.m_size.y / scale));
+    }
 
     qsort(modes.Ptr(), modes.Count(), sizeof(CGxMonitorMode), CGxMonitorModeSort);
 

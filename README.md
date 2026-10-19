@@ -108,7 +108,9 @@ and `SoundTest` build into `bin/Mac/` too.
 3. Start `bin/Win/WowClient64.exe` (or `Wow64.exe`).
 
 On macOS, put (or symlink) the `Data` folder in `bin/Mac/`, next to `Wow.app`, and start `bin/Mac/Wow.app` or
-`bin/Mac/WowClient`. The client reports itself to the server as Windows x86, as the original does. Warden's modules
+`bin/Mac/WowClient`. On Retina displays the game renders at full resolution; to render at one pixel per point instead
+(faster, softer), run `defaults write org.wowdecomp.wow Retina -bool NO` (or `WowClient` in place of the bundle id for
+the plain executable), or set `WOWDECOMP_RETINA=0`. The client reports itself to the server as Windows x86, as the original does. Warden's modules
 are x86 code and can't run on Apple Silicon, so connect to a server with Warden turned off.
 
 ## Layout

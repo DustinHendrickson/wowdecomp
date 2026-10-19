@@ -326,8 +326,13 @@ layer. Apple may drop OpenGL at some point.
     copied out of it get depth comparison for `SHADOW2D` lookups. High and above stay D3D only, as in the original
     Mac client.
   - The system cursor is hidden over the game view (the GL device draws the game's cursor itself).
-- Open: one earlier in-world crash that left no log, Warden on servers that enforce it, movies (DivX stub), and
-  Retina 2x rendering.
+- Retina: the game renders at the display's backing resolution (3024x1964 on a 14" M4 MacBook Pro). The Os layer
+  reports window sizes, mouse positions and the desktop in render pixels and converts at the AppKit boundary, so the
+  game sees a high-resolution monitor; the UI keeps its layout and text is rasterized at full resolution. The cursor
+  is a hardware cursor (the game's 32x32 image as the system cursor, shown 32 points across), so it keeps its size;
+  `gxCursor 0` brings back the software cursor. `WOWDECOMP_RETINA=0` or the `Retina` user default set to NO renders at
+  one pixel per point.
+- Open: one earlier in-world crash that left no log, Warden on servers that enforce it, and movies (DivX stub).
 
 ## Rules of the road
 

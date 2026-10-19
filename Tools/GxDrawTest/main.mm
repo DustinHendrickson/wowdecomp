@@ -181,10 +181,12 @@ int main(int argc, char** argv) {
 
     const CRect& window = device->DeviceDefWindow();
     printf("     after resize: def window %.0fx%.0f\n", window.maxX - window.minX, window.maxY - window.minY);
-    CHECK(window.maxX - window.minX == 800 && window.maxY - window.minY == 600);
+    // Render pixels: 800x600 points times the render scale.
+    float scale = OsMacGetRenderScale(device->DeviceWindow());
+    CHECK(window.maxX - window.minX == 800 * scale && window.maxY - window.minY == 600 * scale);
     DrawFrame(0.0f, true);
     uint8_t center[4];
-    Pixel(400, 300, center);
+    Pixel(static_cast<int32_t>(400 * scale), static_cast<int32_t>(300 * scale), center);
     CHECK(Near(center, 0xFF, 0xFF, 0x00));
     GxScenePresent();
 

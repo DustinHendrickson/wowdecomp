@@ -5,14 +5,15 @@
 #include "Engine/Source/Gx/CGxDeviceOpenGL/Mac/MacGlContext.h"
 #include "Engine/Source/Gx/CGxFormat.h"
 #include "Engine/Source/Gx/CGxGammaRamp.h"
+#include "Engine/Source/Os/Mac/OsMacWindow.h"
 
 void* MacGlCreateContext(void* view, const CGxFormat& format) {
     @autoreleasepool {
         NSView* object = (__bridge NSView*)view;
 
-        // Points, not pixels: the Os layer reports sizes and mouse positions in points, and the device sizes its
-        // viewport from them.
-        object.wantsBestResolutionOpenGLSurface = NO;
+        // The drawable is in render pixels, the units the Os layer reports sizes and mouse positions in: backing pixels
+        // with Retina rendering, points without it.
+        object.wantsBestResolutionOpenGLSurface = OsMacGetRenderScale((__bridge void*)object.window) > 1.0f;
 
         uint32_t depth = 24;
         uint32_t stencil = 8;
