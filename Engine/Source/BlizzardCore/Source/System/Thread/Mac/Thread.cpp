@@ -276,8 +276,10 @@ bool Blizzard::Thread::Create(uint32_t (*function)(void*), void* param, ThreadRe
     size_t page = static_cast<size_t>(getpagesize());
     size = (size + page - 1) / page * page;
 
-    if (size < PTHREAD_STACK_MIN) {
-        size = PTHREAD_STACK_MIN;
+    // Windows only commits the requested size and reserves at least the executable's 1 MB default; a pthread stack is
+    // exactly the size given.
+    if (size < kDefaultStackSize) {
+        size = kDefaultStackSize;
     }
 
     void* handle = MacWaitable::CreateThreadObject();

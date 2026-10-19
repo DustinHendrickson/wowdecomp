@@ -222,10 +222,20 @@ FMOD_RESULT FMOD_OS_Thread_Create(const char *name, THREAD_RETURNTYPE (THREAD_CA
     pthread_attr_init(&attributes);
     pthread_attr_setdetachstate(&attributes, PTHREAD_CREATE_DETACHED);
 
-    if (stacksize > 0)
+    /*
+        FMOD asks for small stacks (8 to 64 KB), which on Windows only set the initial commit: the
+        reservation stays at the executable's 1 MB default, and the game's file callbacks (MPQ reads) need more than
+        FMOD's figure. A pthread stack is exactly the size given, so never go below 1 MB.
+    */
     {
-        size_t size = (size_t)stacksize < PTHREAD_STACK_MIN ? PTHREAD_STACK_MIN : (size_t)stacksize;
+        size_t size = stacksize > 0 ? (size_t)stacksize : 0;
         size = (size + 0x3FFF) & ~(size_t)0x3FFF;
+
+        if (size < 1024 * 1024)
+        {
+            size = 1024 * 1024;
+        }
+
         pthread_attr_setstacksize(&attributes, size);
     }
 

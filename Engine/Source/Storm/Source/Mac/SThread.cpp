@@ -16,6 +16,9 @@
 #include "Engine/Source/Storm/Source/SThread.h"
 #include "Engine/Source/Storm/H/storm.h"
 
+// The smallest stack a thread gets; see SCreateThread.
+static const size_t kMinimumStackSize = 1024 * 1024;
+
 namespace {
 
 struct PROCESSCOMPLETION {
@@ -192,11 +195,12 @@ void* SCreateThread(uint32_t dwStackSize, uint32_t (STORMAPI* lpStartAddress)(vo
     pthread_attr_init(&attributes);
     pthread_attr_setdetachstate(&attributes, PTHREAD_CREATE_DETACHED);
 
-    if (dwStackSize) {
-        size_t page = static_cast<size_t>(getpagesize());
-        size_t size = (static_cast<size_t>(dwStackSize) + page - 1) / page * page;
-        pthread_attr_setstacksize(&attributes, size < PTHREAD_STACK_MIN ? PTHREAD_STACK_MIN : size);
-    }
+    // On Windows the stack size is only the initial commit; the reservation is never below the executable's 1 MB
+    // default. A pthread stack is exactly the size given (512 KB when unset), so callers asking for small stacks (or
+    // none) get at least the 1 MB they effectively had.
+    size_t page = static_cast<size_t>(getpagesize());
+    size_t size = (static_cast<size_t>(dwStackSize) + page - 1) / page * page;
+    pthread_attr_setstacksize(&attributes, size < kMinimumStackSize ? kMinimumStackSize : size);
 
     // CREATE_SUSPENDED isn't supported: no caller in the client asks for it.
     pthread_t native;
@@ -264,6 +268,12 @@ void* STORMAPI SCreateThread(uint32_t (STORMAPI* lpStartAddress)(void*), void* l
 }
 
 int32_t STORMAPI SCreateProcess(const char* appName, char* commandLine, void (*callbackWhenProcessCompletes)(void*), void* callbackData) {
+    // CreateProcess with an application name doesn't search PATH and fails when the file isn't there (the client's
+    // crash reporter asks for WowError.exe, which has no Mac counterpart).
+    if (appName && access(appName, X_OK) != 0) {
+        return 0;
+    }
+
     // CreateProcess takes one command line; the shell splits it the way the Windows loader would.
     pid_t process = fork();
 

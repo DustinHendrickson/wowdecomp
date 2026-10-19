@@ -13,7 +13,17 @@ int CGxMonitorModeSort(const void* a, const void* b) {
     const CGxMonitorMode* modeA = static_cast<const CGxMonitorMode*>(a);
     const CGxMonitorMode* modeB = static_cast<const CGxMonitorMode*>(b);
 
-    return modeA->m_size.x * modeA->m_size.y - modeB->m_size.x * modeB->m_size.y;
+    int32_t area = modeA->m_size.x * modeA->m_size.y - modeB->m_size.x * modeB->m_size.y;
+
+    if (area) {
+        return area;
+    }
+
+    if (modeA->m_size.x != modeB->m_size.x) {
+        return modeA->m_size.x - modeB->m_size.x;
+    }
+
+    return static_cast<int32_t>(modeA->m_refreshRate) - static_cast<int32_t>(modeB->m_refreshRate);
 }
 
 uint32_t RefreshRate(CGDisplayModeRef mode) {
@@ -84,31 +94,74 @@ int32_t CGxDevice::AdapterDesktopMode(CGxMonitorMode& mode) {
 }
 
 int32_t CGxDevice::AdapterMonitorModes(TSGrowableArray<CGxMonitorMode>& modes) {
+    // macOS never switches display modes for the game: fullscreen is a borderless window covering the desktop, and a
+    // window is sized in points. So the modes the game chooses from (gxResolution, the video options) are window sizes
+    // in points that fit the desktop: the usual 4:3 and widescreen sizes plus the desktop itself, at each refresh rate
+    // the display offers. The display's own mode list is in pixels and lacks sizes like 1024x768 that the default
+    // settings and the resolution check expect.
+    static const C2iVector s_sizes[] = {
+        { 640, 480 }, { 800, 600 }, { 1024, 768 }, { 1152, 864 }, { 1280, 720 }, { 1280, 800 }, { 1280, 960 },
+        { 1280, 1024 }, { 1366, 768 }, { 1440, 900 }, { 1600, 900 }, { 1600, 1200 }, { 1680, 1050 }, { 1920, 1080 },
+        { 1920, 1200 }, { 2560, 1440 }, { 2560, 1600 },
+    };
+
     modes.SetCount(0);
 
-    CFArrayRef list = CGDisplayCopyAllDisplayModes(CGMainDisplayID(), nullptr);
+    CGxMonitorMode desktop;
 
-    if (!list) {
+    if (!CGxDevice::AdapterDesktopMode(desktop)) {
         return 0;
     }
 
-    for (CFIndex i = 0; i < CFArrayGetCount(list); i++) {
-        CGDisplayModeRef displayMode = (CGDisplayModeRef)CFArrayGetValueAtIndex(list, i);
-        int32_t width = static_cast<int32_t>(CGDisplayModeGetWidth(displayMode));
-        int32_t height = static_cast<int32_t>(CGDisplayModeGetHeight(displayMode));
+    uint32_t rates[16];
+    uint32_t numRates = 0;
+    CFArrayRef list = CGDisplayCopyAllDisplayModes(CGMainDisplayID(), nullptr);
 
-        if (width < 640 || height < 480) {
-            continue;
+    if (list) {
+        for (CFIndex i = 0; i < CFArrayGetCount(list); i++) {
+            uint32_t rate = RefreshRate((CGDisplayModeRef)CFArrayGetValueAtIndex(list, i));
+            uint32_t j = 0;
+
+            while (j < numRates && rates[j] != rate) {
+                j++;
+            }
+
+            if (j == numRates && numRates < sizeof(rates) / sizeof(rates[0])) {
+                rates[numRates++] = rate;
+            }
         }
 
-        CGxMonitorMode* mode = modes.New();
-        mode->m_size.x = width;
-        mode->m_size.y = height;
-        mode->m_bpp = 32;
-        mode->m_refreshRate = RefreshRate(displayMode);
+        CFRelease(list);
     }
 
-    CFRelease(list);
+    if (!numRates) {
+        rates[numRates++] = desktop.m_refreshRate;
+    }
+
+    auto add = [&](int32_t width, int32_t height) {
+        for (uint32_t i = 0; i < modes.Count(); i++) {
+            if (modes[i].m_size.x == width && modes[i].m_size.y == height) {
+                return;
+            }
+        }
+
+        for (uint32_t i = 0; i < numRates; i++) {
+            CGxMonitorMode* mode = modes.New();
+            mode->m_size.x = width;
+            mode->m_size.y = height;
+            mode->m_bpp = 32;
+            mode->m_refreshRate = rates[i];
+        }
+    };
+
+    for (const C2iVector& size : s_sizes) {
+        if (size.x <= desktop.m_size.x && size.y <= desktop.m_size.y) {
+            add(size.x, size.y);
+        }
+    }
+
+    add(desktop.m_size.x, desktop.m_size.y);
+
     qsort(modes.Ptr(), modes.Count(), sizeof(CGxMonitorMode), CGxMonitorModeSort);
 
     return modes.Count() != 0;
