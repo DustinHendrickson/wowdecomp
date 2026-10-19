@@ -215,6 +215,28 @@ static inline char* _strlwr(char* str) {
 #define raw_name name
 #endif
 
+// Critical sections are recursive mutexes, like on Windows. Shared code that sits in Win64/ folders but has no other
+// Windows dependency (Filestack_Streaming.cpp) builds on macOS through these.
+static inline void InitializeCriticalSection(CRITICAL_SECTION* section) {
+    pthread_mutexattr_t attributes;
+    pthread_mutexattr_init(&attributes);
+    pthread_mutexattr_settype(&attributes, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(section, &attributes);
+    pthread_mutexattr_destroy(&attributes);
+}
+
+static inline void DeleteCriticalSection(CRITICAL_SECTION* section) {
+    pthread_mutex_destroy(section);
+}
+
+static inline void EnterCriticalSection(CRITICAL_SECTION* section) {
+    pthread_mutex_lock(section);
+}
+
+static inline void LeaveCriticalSection(CRITICAL_SECTION* section) {
+    pthread_mutex_unlock(section);
+}
+
 // Small Win32 calls that shared code makes directly.
 static inline void Sleep(DWORD milliseconds) {
     usleep((useconds_t)milliseconds * 1000);

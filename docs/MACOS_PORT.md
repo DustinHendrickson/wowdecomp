@@ -157,6 +157,19 @@ files where AppKit is needed). Order is by dependency, lowest first:
 | `WoW/Source/Win64/WinMain.cpp` | `Mac/main.mm`: build the `.app` bundle, set the working dir to the folder next to the bundle so `Data/` is found |
 | `Tools/WowClient/crash_log.cpp` | `signal`/`sigaction` + `backtrace()` crash logger |
 
+**Status: lowest layer done.** Mac implementations exist for BlizzardCore Lock, Process, Thread, Time and the
+native File backend (`Filestack.cpp` on POSIX), and for Storm's SCritSect, SLock (sync objects, CSRWLock) and
+SThread. Notes:
+
+- `BlizzardCore/Source/System/Lock/Mac/Waitable.*` provides Win32-style waitable objects (events, mutexes,
+  semaphores, thread handles, wait-any / wait-all with timeouts). BlizzardCore and Storm handles are these objects.
+- `Win64/File.cpp` (Throttle) and `Win64/Filestack_Streaming.cpp` are portable, so they build on Mac as they are
+  (include guard only).
+- Mac files carry no `// OFFSET:` tags: they aren't decompiled functions.
+- A smoke test (threads, events, TLS destructors, waits, semaphores, rwlocks, time round trips, file I/O with
+  backslash paths) passes.
+- Undefined symbols at link: 387 -> 286.
+
 SEH (`__try/__except`) in these layers becomes `sigaction`/`setjmp` handlers or plain error checks.
 D3D's SEH stays in the Windows-only backend.
 
