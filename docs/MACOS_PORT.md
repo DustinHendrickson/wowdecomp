@@ -272,7 +272,7 @@ layer. Apple may drop OpenGL at some point.
 
 **Done when:** full session (login -> world -> zone changes, sound, music) works.
 
-**Status: client links and starts; waiting on game data.** `Wow` and `WowClient` link with no undefined symbols
+**Status: boots into the world with game data.** `Wow` and `WowClient` link with no undefined symbols
 (106 -> 0). Without a `Data` folder the client gets through Storm, command line, CVars and locale setup, then stops at
 "Missing or corrupted data" from `OpenArchives`, as the original does. Notes:
 
@@ -301,8 +301,24 @@ layer. Apple may drop OpenGL at some point.
 - Linkage gotcha: Clang with `-fms-extensions` keeps external linkage for a `static` declared after an `extern` of the
   same name, where MSVC makes it internal. MinimapFrame's `s_mapId` collided with Map's, so it was renamed
   `s_minimapMapId`.
-- Next: boot with a 3.3.5a `Data` folder and fix what breaks on the way to the login screen (MPQ, DBC, GlueXML,
-  fonts, BLP textures, the arbvp1/arbfp1 shaders). Then character select and the world.
+- With a 3.3.5a `Data` folder (custom patch MPQs included) the client opens every archive, shows the login screen,
+  and logs in through realm list and character select into the world on a live server. Fixes on the way:
+  - Monitor modes are window sizes in points that fit the desktop. The display's pixel mode list has no 1024x768, so
+    the default `gxResolution` was rejected and left unset.
+  - Threads get at least 1 MB of stack, the reservation Windows gives every thread whatever size it asks for.
+    FMOD's 32 KB loader thread overflowed in the MPQ read callback.
+  - Texture render targets: the GL device draws into a pbuffer through its own context and copies the result. With
+    no pbuffer, `wglMakeCurrent` made no context current and all GL calls until the target was unset were lost while
+    the state cache recorded them, so models exploded or vanished. The pbuffer is now a framebuffer object.
+  - `IXformSetProjection` tested the sign of the whole master-enable mask instead of `NormalProjection` (bit 7), so
+    every perspective frame had its clip planes 5x too far out. This was a decompilation error in shared code.
+  - libjpeg's `INT32` (`long`, 64-bit here) overflowed the 16 KB allocation chunk, which crashed screenshots.
+    `fopen` turns backslashes into slashes.
+- The login scene renders correctly on the shader path. Checked from the game's own screenshots, with
+  `WOWDECOMP_SCREENSHOTS="15,25"` pressing Print Screen at those seconds; `WOWDECOMP_GLDEBUG=1` reports rejected
+  ARB programs, GL errors, bad draw ranges and context-less buffer calls.
+- Open: in-world rendering after the fixes, one earlier in-world crash that left no log, Warden on servers that
+  enforce it, movies (DivX stub), and Retina 2x rendering.
 
 ## Rules of the road
 
