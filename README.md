@@ -44,6 +44,14 @@ parts of FMOD Ex).
   executables; the x64 build uses its own decoder instead)
 - A World of Warcraft **3.3.5a (12340)** client. No game data is included in this repository.
 
+On macOS (Apple Silicon, work in progress, see [docs/MACOS_PORT.md](docs/MACOS_PORT.md)):
+
+- macOS 13 or newer on an M-series Mac
+- Xcode Command Line Tools (`xcode-select --install`)
+- CMake and Ninja (`brew install cmake ninja`)
+- The `Data` folder of a 3.3.5a client. The MPQs are the same on every platform, so a Windows install's `Data`
+  works.
+
 ## Building
 
 From a Developer PowerShell or any shell with `cmake` on `PATH`:
@@ -74,6 +82,17 @@ The client is written to `bin/Win/`:
 `WowClient_crash.log` when the client crashes. `Wow` is the same client without it. You can also turn the
 logger off in `WowClient` with `-DWOWCLIENT_CRASH_LOG=OFF`.
 
+### macOS
+
+```bash
+cmake -S . -B build/mac -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build/mac --target Wow WowClient
+```
+
+This writes `bin/Mac/Wow.app` (the app bundle) and `bin/Mac/WowClient` (the same client as a plain executable,
+handy from a terminal since its output goes there). The Mac-only self-tests `OsWindowTest`, `GxDrawTest`, `NetTest`
+and `SoundTest` build into `bin/Mac/` too.
+
 ### Options
 
 | CMake option | Default | Effect |
@@ -88,6 +107,10 @@ logger off in `WowClient` with `-DWOWCLIENT_CRASH_LOG=OFF`.
 2. Point `Data/<locale>/realmlist.wtf` at the server you want to connect to.
 3. Start `bin/Win/WowClient64.exe` (or `Wow64.exe`).
 
+On macOS, put (or symlink) the `Data` folder in `bin/Mac/`, next to `Wow.app`, and start `bin/Mac/Wow.app` or
+`bin/Mac/WowClient`. The client reports itself to the server as Windows x86, as the original does. Warden's modules
+are x86 code and can't run on Apple Silicon, so connect to a server with Warden turned off.
+
 ## Layout
 
 | Path | Contents |
@@ -98,6 +121,7 @@ logger off in `WowClient` with `-DWOWCLIENT_CRASH_LOG=OFF`.
 | `ThirdParty/` | Libraries linked from their upstream sources |
 | `Tools/WowClient/` | The `WowClient` executable target |
 | `Tools/XvidDecoder/` | x64 movie decoder that replaces the original 32-bit `DivxDecoder.dll` |
+| `Tools/OsWindowTest/`, `Tools/GxDrawTest/`, `Tools/NetTest/`, `Tools/SoundTest/` | macOS self-tests for the window and input, OpenGL device, network and sound layers (`--self-test` / no arguments) |
 
 ## Special thanks
 

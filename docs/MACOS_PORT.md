@@ -252,7 +252,8 @@ path the original Mac client used. Notes:
   and passes.
 - Not exercised yet: game shaders and textures (they need the MPQs, which need the full client), fullscreen,
   Retina 2x rendering, multisampling.
-- Undefined symbols at link: 114 -> 106 (FMOD, Net, LCD stubs, Warden/BotCheck, Battlenet/ComSat, movie, `main`).
+- Undefined symbols at link: 114 -> 106 (FMOD, Net, LCD stubs, Warden/BotCheck, Battlenet/ComSat, movie, `main`). Phase 4
+  took them to 0.
 
 Later option, out of scope for the first playable build: a Metal backend, or D3D9 through a translation
 layer. Apple may drop OpenGL at some point.
@@ -270,6 +271,38 @@ layer. Apple may drop OpenGL at some point.
 - Update `README.md` with Mac requirements and build steps.
 
 **Done when:** full session (login -> world -> zone changes, sound, music) works.
+
+**Status: client links and starts; waiting on game data.** `Wow` and `WowClient` link with no undefined symbols
+(106 -> 0). Without a `Data` folder the client gets through Storm, command line, CVars and locale setup, then stops at
+"Missing or corrupted data" from `OpenArchives`, as the original does. Notes:
+
+- Net: `WowServices/Mac/WowConnectionNet.cpp` runs the shared `WowConnection` state machine on a `poll()` loop with a
+  wake pipe in place of WSAEventSelect. The interest set and service flags are the Windows ones. The portable
+  `Win64/WowConnection.cpp`, `Win64/BattlenetLogin.cpp` and ComSat's address code build unchanged against
+  `Os/Mac/Win32Sockets.h` (Winsock names on BSD sockets). `WowConnectionNet::WORKER` is packed on Windows only,
+  because a packed pthread mutex is misaligned on arm64. ComSat's UDP socket is `ComSat/Mac/ComSatNetworkSocketPosix.cpp`.
+- `Tools/NetTest` drives `WowConnection` against a loopback server and passes. It covers connecting by address and
+  by name, 2- and 3-byte message frames, stream reads, a 4 MB queued send, disconnects from either side, refused
+  connections reported through `WCCantConnect`, and no CPU use while idle.
+- FMOD Ex: `fmodex/mac/src` has a CoreAudio output (`OutputCoreAudio`, a polled output feeding the default output
+  AudioUnit from a ring buffer), plus the OS layer on pthreads, dispatch semaphores and stdio, and a BSD socket net
+  layer. The resampler and distortion DSPs use their C paths. `Tools/SoundTest` sets FMOD up the way SoundEngine
+  does, checks that CoreAudio is picked (48 kHz stereo PCM16 on an M4), and plays a sample and a file stream in real
+  time. It passes; `--audible` plays them out loud.
+- Stubs: `CGLCD` (no Logitech LCD), DivX (movies fail to open; `StartMovie` returns 0 and the glue goes on),
+  `HidManager` with no devices, Battlenet library loading through `dlopen`, BotCheck without SEH, and the patch
+  downloader launched through `Blizzard::Process`. `WardenClient.cpp` builds as is. Warden's modules are x86 and
+  can't run, so the client needs a server with Warden off. OS and CPU stay `Win` / `x86` in the login packets.
+- `WoW/Source/Mac/main.mm`: ignores SIGPIPE, changes to the game folder, and calls `CommonMain`.
+- `Wow` is `bin/Mac/Wow.app`: an Info.plist, an icon built from `waystone.ico` with `sips` / `iconutil`, and an ad-hoc
+  signature over the bundle. `WowClient` stays a plain executable for terminal use. In a bundle the game folder is
+  the one holding `Wow.app` (`GetModuleFileNameUTF8` / `GetProcessDirectory` stop at `.app`), so `Data/` and `WTF/`
+  sit next to it.
+- Linkage gotcha: Clang with `-fms-extensions` keeps external linkage for a `static` declared after an `extern` of the
+  same name, where MSVC makes it internal. MinimapFrame's `s_mapId` collided with Map's, so it was renamed
+  `s_minimapMapId`.
+- Next: boot with a 3.3.5a `Data` folder and fix what breaks on the way to the login screen (MPQ, DBC, GlueXML,
+  fonts, BLP textures, the arbvp1/arbfp1 shaders). Then character select and the world.
 
 ## Rules of the road
 

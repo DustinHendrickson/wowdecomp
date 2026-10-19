@@ -97,3 +97,35 @@ set(WOWDECOMP_MAC_FRAMEWORKS
     "-framework Security"
     "-framework SystemConfiguration"
 )
+
+# Builds the bundle icon from waystone.ico (32x32) with sips and iconutil and adds it to the target as a bundle
+# resource. The name without extension is what Info.plist's CFBundleIconFile takes.
+function(wowdecomp_mac_bundle_icon target name)
+    set(ico ${CMAKE_SOURCE_DIR}/waystone.ico)
+    set(work ${CMAKE_CURRENT_BINARY_DIR}/${name})
+    set(icns ${CMAKE_CURRENT_BINARY_DIR}/${name}.icns)
+    set(commands
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${work}.iconset
+        COMMAND sips -s format png ${ico} --out ${work}.png
+    )
+
+    foreach (size 16 32 128 256 512)
+        math(EXPR double "${size} * 2")
+        list(APPEND commands
+            COMMAND sips -z ${size} ${size} ${work}.png --out ${work}.iconset/icon_${size}x${size}.png
+            COMMAND sips -z ${double} ${double} ${work}.png --out ${work}.iconset/icon_${size}x${size}@2x.png
+        )
+    endforeach ()
+
+    add_custom_command(
+        OUTPUT ${icns}
+        ${commands}
+        COMMAND iconutil -c icns ${work}.iconset -o ${icns}
+        DEPENDS ${ico}
+        COMMENT "Building ${name}.icns"
+        VERBATIM
+    )
+
+    target_sources(${target} PRIVATE ${icns})
+    set_source_files_properties(${icns} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+endfunction ()

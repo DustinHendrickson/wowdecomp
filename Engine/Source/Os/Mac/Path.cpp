@@ -27,7 +27,15 @@ uint32_t GetModuleFileNameUTF8(void* module, char* path, uint32_t size) {
     }
 
     char resolved[PATH_MAX];
-    const char* source = realpath(executable, resolved) ? resolved : executable;
+    char* source = realpath(executable, resolved) ? resolved : executable;
+
+    // In a bundle the application file is Wow.app, not Wow.app/Contents/MacOS/Wow: callers strip the filename to find
+    // the game folder (OsGetExePath), which holds Data/ next to the bundle, as Blizzard::Process::GetProcessDirectory
+    // does.
+    if (char* bundle = strstr(source, ".app/Contents/MacOS/")) {
+        bundle[4] = '\0';
+    }
+
     uint32_t written = static_cast<uint32_t>(strlen(source));
 
     if (written >= size) {
