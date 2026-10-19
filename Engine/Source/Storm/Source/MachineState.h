@@ -2,7 +2,9 @@
 #define ENGINE_SOURCE_STORM_SOURCE_MACHINESTATE_H
 
 #include <cstdint>
+#if defined(_WIN32)
 #include <windows.h>
+#endif
 
 #define LOG_OPTION_DEFAULT 0x1
 #define LOG_OPTION_TITLE 0x2

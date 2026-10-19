@@ -118,6 +118,22 @@ impact (they open Phase 1):
 **Done when:** every module except the platform layers compiles with Clang on arm64. (Linking isn't
 expected yet.)
 
+**Status: nearly done.** 49 of 52 libraries build. The 5 files left all include x86 SSE headers
+(`ComSat/SPIRIT/SpiritFrame.cpp`, `SpiritPitch.cpp`, `Model2/M2Model.cpp`, `M2Scene.cpp`,
+`WoW/Common/ComponentCore/CharacterComponent.cpp`) and are waiting on sse2neon. What changed:
+
+- Shared files include `<windows.h>` (and `process.h`, `winerror.h`, `mbstring.h`) only under `_WIN32`.
+- `Platform.h` gained `CRITICAL_SECTION` (= recursive `pthread_mutex_t` in the Mac lock code), `RECT`,
+  STRICT-style `HWND`/`HINSTANCE`, opaque `OVERLAPPED`/`SYSTEMTIME`/`LARGE_INTEGER`, `fopen_s`, `_atoi64` and
+  friends, `_ismbcspace`, `_cexit`, and `GetACP`.
+- Clang-only fixes that don't change Windows codegen: `CDataStoreCache::DetachBuffer` parameter name,
+  const-correct adapter casts in `BSNEncodeInterface.cpp`, `<cfloat>` in `World.cpp`.
+- `Storm.cpp`: `StormGetInstance` / `StormExitProcess` have small in-place Mac branches.
+- FMOD Ex: CD audio is off on Mac, and the Windows OpenAL loader only builds on Windows.
+- `UILCD/LCD.cpp` (Logitech LCD) is excluded on Mac. Phase 2 needs `CGLCD` stubs.
+
+Not checked yet: `long` (LP64) audit and `wchar_t` usage. These compile cleanly but can be wrong at runtime.
+
 ### Phase 2: Mac platform layer (the bulk of the work)
 
 Write a `Mac/` implementation next to each `Win64/` folder, using POSIX + Cocoa (Objective-C++ `.mm`

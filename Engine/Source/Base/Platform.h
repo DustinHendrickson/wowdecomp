@@ -13,6 +13,9 @@
 #if !defined(_WIN32)
 
 #include <alloca.h>
+#include <ctype.h>
+#include <errno.h>
+#include <pthread.h>
 #include <malloc/malloc.h>
 #include <math.h>
 #include <stdint.h>
@@ -52,9 +55,10 @@ typedef uint32_t UINT;
 typedef int64_t LONGLONG;
 typedef uint64_t ULONGLONG;
 typedef void* HANDLE;
-typedef void* HWND;
-typedef void* HINSTANCE;
-typedef void* HMODULE;
+// Distinct handle types like <windows.h> under STRICT, which shared headers forward-declare (HWND__*, HINSTANCE__*).
+typedef struct HWND__* HWND;
+typedef struct HINSTANCE__* HINSTANCE;
+typedef HINSTANCE HMODULE;
 typedef void* LPVOID;
 typedef const char* LPCSTR;
 typedef char* LPSTR;
@@ -69,6 +73,22 @@ typedef char* LPSTR;
 #ifndef MAX_PATH
 #define MAX_PATH 260
 #endif
+
+// Win32 types that shared headers declare. CRITICAL_SECTION is held by value (Blizzard::Lock::Mutex, SCritSect,
+// CCritSect), so it gets a real type: the Mac implementations treat it as a recursive pthread mutex, matching
+// critical-section semantics. The others only appear as pointer parameters of Windows-implementation functions,
+// so they stay opaque: shared code that touches their members fails to compile, which marks it for a Mac version.
+typedef pthread_mutex_t CRITICAL_SECTION;
+typedef struct _OVERLAPPED OVERLAPPED;
+typedef struct _SYSTEMTIME SYSTEMTIME;
+typedef union _LARGE_INTEGER LARGE_INTEGER;
+
+typedef struct tagRECT {
+    LONG left;
+    LONG top;
+    LONG right;
+    LONG bottom;
+} RECT;
 
 #ifndef GUID_DEFINED
 #define GUID_DEFINED
@@ -154,6 +174,22 @@ static inline unsigned char _BitScanReverse(uint32_t* index, uint32_t mask) {
 #define _msize(p) malloc_size(p)
 #define _hypot hypot
 #define _copysign copysign
+#define _atoi64 atoll
+#define _strtoi64 strtoll
+#define _strtoui64 strtoull
+// Single-byte check is right for the UTF-8 and C locales used here.
+#define _ismbcspace(c) isspace(c)
+
+static inline int fopen_s(FILE** stream, const char* name, const char* mode) {
+    *stream = fopen(name, mode);
+    return *stream ? 0 : errno;
+}
+
+// MSVC's _cexit runs atexit handlers and flushes streams without ending the process; Storm then calls _exit.
+// POSIX has no way to run atexit handlers alone, so this only flushes. The Mac Storm layer should call exit() instead.
+static inline void _cexit(void) {
+    fflush(NULL);
+}
 
 static inline char* _strupr(char* str) {
     for (char* c = str; *c; ++c) {
@@ -186,6 +222,11 @@ static inline void Sleep(DWORD milliseconds) {
 
 static inline void OutputDebugStringA(LPCSTR text) {
     fputs(text, stderr);
+}
+
+// ANSI code page, reported with IME events. macOS text is UTF-8.
+static inline UINT GetACP(void) {
+    return 65001;
 }
 
 #endif // !_WIN32

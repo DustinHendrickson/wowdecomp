@@ -2,7 +2,8 @@ file(GLOB_RECURSE PRIVATE_SOURCES CONFIGURE_DEPENDS "*.cpp")
 wowdecomp_platform_sources(PRIVATE_SOURCES)
 
 if (NOT WIN32)
-    list(FILTER PRIVATE_SOURCES EXCLUDE REGEX "/UILCD/Windows/")
+    # Logitech G-series LCD support. LCD.cpp is built around the Windows-only CEzLcd; macOS gets stubs instead.
+    list(FILTER PRIVATE_SOURCES EXCLUDE REGEX "/UILCD/(Windows/|LCD\\.cpp$)")
 endif ()
 
 add_library(Ui STATIC

@@ -697,6 +697,7 @@
 
     #undef FMOD_SUPPORT_ASF
 	#undef FMOD_SUPPORT_VAG
+    #undef FMOD_SUPPORT_CDDA    /* wowdecomp: the CD audio codec belongs to the Mac platform layer, not ported */
       
 #elif defined(PLATFORM_GC)
 
