@@ -44,7 +44,7 @@ target_include_directories(WowClient
 
 if (WOWDECOMP_PLATFORM_WIN)
     target_link_options(WowClient PRIVATE "/INCREMENTAL:NO" "/ENTRY:start")
-    target_link_libraries(WowClient PRIVATE SteelseriesMouse dbghelp)
+    target_link_libraries(WowClient PRIVATE dbghelp)
 endif ()
 
 target_link_libraries(WowClient
@@ -70,6 +70,7 @@ target_link_libraries(WowClient
         ShaderEffect
         Tempest
         SoundEngine
+        SteelseriesMouse
         Storm
         WoWCommon
         Battlenet

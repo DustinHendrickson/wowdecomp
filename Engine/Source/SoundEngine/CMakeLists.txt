@@ -28,6 +28,11 @@ else ()
         "${FMODEX_PLATFORM_DIR}/*.cpp"
         "${FMODEX_PLATFORM_DIR}/*.mm"
     )
+    # Plain C DSPs that sit in win32/src next to their x86 assembly versions (FMOD_SUPPORT_SIMD is off on Mac).
+    list(APPEND FMODEX_PLATFORM_SOURCES
+        ${FMODEX_DIR}/win32/src/fmod_dsp_resampler_linear.cpp
+        ${FMODEX_DIR}/win32/src/fmod_dsp_distortion.cpp
+    )
 endif ()
 
 add_library(fmodex STATIC ${FMODEX_SOURCES} ${FMODEX_PLATFORM_SOURCES})

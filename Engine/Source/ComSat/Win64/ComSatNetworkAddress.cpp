@@ -1,6 +1,10 @@
 #if defined(WOWDECOMP_ARCH_64)
 
+#if defined(_WIN32)
 #include <winsock2.h>
+#else
+#include "Engine/Source/Os/Mac/Win32Sockets.h"
+#endif
 #include <cstdlib>
 #include <cstring>
 #include "Engine/Source/ComSat/ComSatNetwork.h"

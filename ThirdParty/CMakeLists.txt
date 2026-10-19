@@ -179,7 +179,12 @@ elseif (WIN32)
             XvidDecoder
     )
 endif ()
-# macOS: no movie decoder yet (needs xvidcore built from source for arm64).
+if (APPLE)
+    # No movie decoder yet (it needs xvidcore built from source for arm64): decoders fail and movies are skipped.
+    add_library(DivxDecoderMac STATIC DivxDecoder/Mac/DivxDecoder.cpp)
+    target_include_directories(DivxDecoderMac PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/DivxDecoder)
+    target_link_libraries(DivxDecoder INTERFACE DivxDecoderMac)
+endif ()
 
 if (WIN32)
     add_library(lgLcd STATIC

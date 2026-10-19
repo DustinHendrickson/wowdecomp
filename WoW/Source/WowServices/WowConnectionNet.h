@@ -11,7 +11,11 @@
 
 class WowConnectionNet {
     public:
+    // Packed like the original on Windows. Not on macOS: the SCritSect would sit at an odd offset, and pthread mutexes
+    // need natural alignment on arm64.
+#if defined(_WIN32)
 #pragma pack(push, 1)
+#endif
     struct WORKER {
         /* 0000 */ WowConnectionNet* m_owner;
         /* 0004 */ SThread m_thread;
@@ -25,7 +29,9 @@ class WowConnectionNet {
 
         WORKER();
     };
+#if defined(_WIN32)
 #pragma pack(pop)
+#endif
 
     /* 0000 */ SThread m_thread;
     /* 0004 */ SEvent m_stopEvent;

@@ -35,7 +35,6 @@ target_include_directories(Wow
 
 if (WOWDECOMP_PLATFORM_WIN)
     target_link_options(Wow PRIVATE "/INCREMENTAL:NO" "/ENTRY:start")
-    target_link_libraries(Wow PRIVATE SteelseriesMouse)
 endif ()
 
 target_link_libraries(Wow
@@ -61,6 +60,7 @@ target_link_libraries(Wow
         ShaderEffect
         Tempest
         SoundEngine
+        SteelseriesMouse
         Storm
         WoWCommon
         Battlenet

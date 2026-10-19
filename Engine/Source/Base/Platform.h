@@ -109,7 +109,8 @@ typedef struct _GUID {
 } GUID;
 #endif
 
-// Interlocked operations. Type-generic so they work on int32_t, uint32_t and pointers alike. Return values follow
+// Interlocked operations. Type-generic so they work on int32_t, uint32_t and pointers alike (the cast inside
+// __typeof__ drops volatile from the comparand's copy). Return values follow
 // the Win32 API: Increment / Decrement return the new value, Exchange / ExchangeAdd / CompareExchange the old one.
 #define InterlockedIncrement(p) __atomic_add_fetch((p), 1, __ATOMIC_SEQ_CST)
 #define InterlockedDecrement(p) __atomic_sub_fetch((p), 1, __ATOMIC_SEQ_CST)
@@ -117,7 +118,7 @@ typedef struct _GUID {
 #define InterlockedExchangeAdd(p, v) __atomic_fetch_add((p), (v), __ATOMIC_SEQ_CST)
 #define InterlockedCompareExchange(p, exchange, comparand)                                                     \
     ({                                                                                                         \
-        __typeof__(*(p)) wowdecomp_expected_ = (comparand);                                                    \
+        __typeof__((__typeof__(*(p)))0) wowdecomp_expected_ = (comparand);                                     \
         __atomic_compare_exchange_n((p), &wowdecomp_expected_, (exchange), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); \
         wowdecomp_expected_;                                                                                   \
     })
