@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 #include <dlfcn.h>
 #include <pthread.h>
 #include <OpenGL/OpenGL.h>
@@ -322,7 +323,79 @@ BOOL wglMakeCurrent(HDC dc, HGLRC context) {
     return YES;
 }
 
+namespace {
+
+// Debugging aid: WOWDECOMP_FRAMEDUMP="8,14" writes the frame being presented that many seconds after the first one to
+// FrameDump_<seconds>.png in the working directory (the game folder). Unlike the game's own screenshots it works in any
+// state, movies included.
+void DumpScheduledFrame(NSOpenGLContext* context) {
+    static std::vector<double> s_times;
+    static bool s_parsed;
+    static CFAbsoluteTime s_start;
+
+    if (!s_parsed) {
+        s_parsed = true;
+        s_start = CFAbsoluteTimeGetCurrent();
+
+        for (const char* times = getenv("WOWDECOMP_FRAMEDUMP"); times && *times;) {
+            char* end;
+            double seconds = strtod(times, &end);
+
+            if (end == times) {
+                break;
+            }
+
+            s_times.push_back(seconds);
+            times = *end == ',' ? end + 1 : end;
+        }
+    }
+
+    if (s_times.empty() || CFAbsoluteTimeGetCurrent() - s_start < s_times.front()) {
+        return;
+    }
+
+    double seconds = s_times.front();
+    s_times.erase(s_times.begin());
+
+    NSView* view = context.view;
+    NSRect bounds = view.wantsBestResolutionOpenGLSurface ? [view convertRectToBacking:view.bounds] : view.bounds;
+    GLsizei width = static_cast<GLsizei>(bounds.size.width);
+    GLsizei height = static_cast<GLsizei>(bounds.size.height);
+
+    GLint framebuffer = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &framebuffer);
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+    glReadBuffer(GL_BACK);
+
+    std::vector<uint8_t> pixels(static_cast<size_t>(width) * height * 4);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, framebuffer);
+
+    @autoreleasepool {
+        NSBitmapImageRep* rep = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:nullptr pixelsWide:width pixelsHigh:height bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO colorSpaceName:NSDeviceRGBColorSpace bytesPerRow:width * 4 bitsPerPixel:32];
+
+        // GL rows run bottom up; the frame's alpha isn't meaningful, so it is made opaque.
+        for (GLsizei y = 0; y < height; y++) {
+            uint8_t* row = rep.bitmapData + static_cast<size_t>(y) * width * 4;
+            memcpy(row, pixels.data() + static_cast<size_t>(height - 1 - y) * width * 4, static_cast<size_t>(width) * 4);
+
+            for (GLsizei x = 0; x < width; x++) {
+                row[x * 4 + 3] = 0xFF;
+            }
+        }
+
+        NSData* png = [rep representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+        NSString* name = [NSString stringWithFormat:@"FrameDump_%g.png", seconds];
+        [png writeToFile:name atomically:YES];
+    }
+}
+
+}
+
 BOOL wglSwapLayerBuffers(HDC dc, UINT planes) {
-    [[NSOpenGLContext currentContext] flushBuffer];
+    NSOpenGLContext* context = [NSOpenGLContext currentContext];
+    DumpScheduledFrame(context);
+    [context flushBuffer];
     return YES;
 }

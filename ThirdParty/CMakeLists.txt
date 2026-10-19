@@ -180,9 +180,35 @@ elseif (WIN32)
     )
 endif ()
 if (APPLE)
-    # No movie decoder yet (it needs xvidcore built from source for arm64): decoders fail and movies are skipped.
-    add_library(DivxDecoderMac STATIC DivxDecoder/Mac/DivxDecoder.cpp)
-    target_include_directories(DivxDecoderMac PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/DivxDecoder)
+    # xvidcore 1.3.7 from source, plain C for arm64 (see xvidcore/README.md): the MPEG-4 decoder behind the movies.
+    set(XVIDCORE_SRC ${CMAKE_CURRENT_SOURCE_DIR}/xvidcore/src)
+    set(XVIDCORE_SOURCES
+        decoder.c encoder.c xvid.c
+        bitstream/bitstream.c bitstream/cbp.c bitstream/mbcoding.c
+        dct/fdct.c dct/idct.c dct/simple_idct.c
+        image/colorspace.c image/image.c image/interpolate8x8.c image/font.c image/postprocessing.c image/qpel.c
+        image/reduced.c
+        motion/estimation_bvop.c motion/estimation_common.c motion/estimation_gmc.c motion/estimation_pvop.c
+        motion/estimation_rd_based.c motion/estimation_rd_based_bvop.c motion/gmc.c motion/motion_comp.c
+        motion/vop_type_decision.c motion/sad.c
+        prediction/mbprediction.c
+        plugins/plugin_single.c plugins/plugin_2pass1.c plugins/plugin_2pass2.c plugins/plugin_lumimasking.c
+        plugins/plugin_dump.c plugins/plugin_psnr.c plugins/plugin_ssim.c plugins/plugin_psnrhvsm.c
+        quant/quant_h263.c quant/quant_matrix.c quant/quant_mpeg.c
+        utils/emms.c utils/mbtransquant.c utils/mem_align.c utils/mem_transfer.c utils/timer.c
+    )
+    list(TRANSFORM XVIDCORE_SOURCES PREPEND ${XVIDCORE_SRC}/)
+
+    add_library(xvidcore STATIC ${XVIDCORE_SOURCES})
+    target_include_directories(xvidcore PRIVATE ${XVIDCORE_SRC})
+    # What xvidcore's configure picks for a 64-bit little-endian CPU without assembly support.
+    target_compile_definitions(xvidcore PRIVATE ARCH_IS_GENERIC ARCH_IS_64BIT ARCH_IS_LITTLE_ENDIAN)
+    target_compile_options(xvidcore PRIVATE -w)
+
+    # The DivxDecoder entry points on xvidcore: Tools/XvidDecoder, the Windows x64 build's decoder DLL, linked in.
+    add_library(DivxDecoderMac STATIC ${CMAKE_SOURCE_DIR}/Tools/XvidDecoder/XvidDecoder.cpp)
+    target_include_directories(DivxDecoderMac PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/xvidcore/include)
+    target_link_libraries(DivxDecoderMac PRIVATE xvidcore)
     target_link_libraries(DivxDecoder INTERFACE DivxDecoderMac)
 endif ()
 

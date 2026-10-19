@@ -264,7 +264,7 @@ layer. Apple may drop OpenGL at some point.
   `fmod_channel_openal` path against macOS's (deprecated) OpenAL.framework). Exclude the DirectSound,
   WinMM, ASIO, ASF/WMSDK and Winamp code. Swap the `*_asm.s` x86 DSP paths for their C fallbacks.
 - Movies: `libxvidcore.lib` is a Windows prebuilt. Build xvidcore from source for arm64 (generic C,
-  no asm), or skip intro and cinematic movies at first.
+  no asm), or skip intro and cinematic movies at first. (Done: see the status below.)
 - Stub or remove nvapi, Logitech LCD, SteelSeries mouse and DivX on Mac.
 - `.app` bundle, icon (`waystone.ico` -> `.icns`), `Info.plist`, Retina/HiDPI handling, ad-hoc
   codesign so Gatekeeper lets it launch.
@@ -332,7 +332,12 @@ layer. Apple may drop OpenGL at some point.
   is a hardware cursor (the game's 32x32 image as the system cursor, shown 32 points across), so it keeps its size;
   `gxCursor 0` brings back the software cursor. `WOWDECOMP_RETINA=0` or the `Retina` user default set to NO renders at
   one pixel per point.
-- Open: one earlier in-world crash that left no log, Warden on servers that enforce it, and movies (DivX stub).
+- Movies: xvidcore 1.3.7 is built from source on macOS (`ThirdParty/xvidcore/src`, generic C, no assembly), and
+  `Tools/XvidDecoder/XvidDecoder.cpp`, the Windows x64 build's decoder DLL, is linked in as the DivxDecoder entry
+  points. The intro and cinematics play (checked with the Wrath intro). `WOWDECOMP_FRAMEDUMP="8,14"` writes the frame
+  being presented at those seconds to `FrameDump_<seconds>.png`, which works where the game's screenshots don't
+  (movies).
+- Open: one earlier in-world crash that left no log, and Warden on servers that enforce it.
 
 ## Rules of the road
 
