@@ -324,6 +324,8 @@ const char* SignalName(int signal) {
             return "FLOATING_POINT";
         case SIGTRAP:
             return "BREAKPOINT";
+        case SIGABRT:
+            return "ABORT";
         default:
             return "unknown exception";
     }
@@ -757,6 +759,10 @@ void STORMAPI SErrCatchUnhandledExceptions() {
     sigaction(SIGBUS, &action, nullptr);
     sigaction(SIGILL, &action, nullptr);
     sigaction(SIGFPE, &action, nullptr);
+
+    // abort(): failed assertions, uncaught C++ exceptions, pure virtual calls. Windows' unhandled-exception filter
+    // doesn't see these either, but on macOS they are worth a log.
+    sigaction(SIGABRT, &action, nullptr);
 }
 
 void SErrDisplayAppFatalMessage(const char* message, const char* filename, int32_t linenumber) {

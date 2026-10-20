@@ -13,6 +13,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "Engine/Source/BlizzardCore/Source/System/Lock/Mac/Waitable.h"
+#include "Engine/Source/BlizzardCore/Source/System/Thread/Mac/SignalStack.h"
 #include "Engine/Source/Storm/Source/SThread.h"
 #include "Engine/Source/Storm/H/storm.h"
 
@@ -37,6 +38,7 @@ struct THREADLAUNCH {
 const int32_t kThreadPriorityNormal = 0;
 
 void* PosixLaunch(void* param) {
+    MacThreadSignalStack signalStack;
     THREADLAUNCH* launch = static_cast<THREADLAUNCH*>(param);
     void* handle = launch->threadH;
 

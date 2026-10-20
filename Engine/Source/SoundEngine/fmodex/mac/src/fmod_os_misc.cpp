@@ -18,6 +18,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include "../../../../BlizzardCore/Source/System/Thread/Mac/SignalStack.h"
 
 struct FMOD_OS_CRITICALSECTION
 {
@@ -43,6 +44,7 @@ namespace
 
     void *ThreadEntry(void *param)
     {
+        MacThreadSignalStack signalStack;   /* So the game's crash handler can report a stack overflow here too. */
         ThreadStart *start = (ThreadStart *)param;
 
         if (start->name[0])

@@ -340,7 +340,12 @@ layer. Apple may drop OpenGL at some point.
 - Keyboard: Cmd+A/C/X/V reach the game as Ctrl+A/C/X/V, the select all, copy, cut and paste its edit boxes already
   handle; other Command shortcuts go to the menu (Cmd+Q quit, Cmd+H hide, Cmd+M minimize, Cmd+Ctrl+F full screen).
 - Windowed mode checked at 2048x1280 (a 1024x640-point window at 2x) and, with Retina off, at 1280x800.
-- Open: one earlier in-world crash that left no log, and Warden on servers that enforce it.
+- Crash logs: every thread the Mac layers start (Storm, BlizzardCore, FMOD) gets its own alternate signal stack, so a
+  stack overflow off the main thread is reported instead of hanging, and `abort()` (failed assertions, uncaught C++
+  exceptions) is caught too. Checked with a harness: segfaults and overflows on the main thread and on a Storm thread,
+  and `abort()`, all write `Errors/<date> Crash.txt` with a stack trace. The one earlier in-world crash with no log
+  predates the GL context fix and hasn't recurred.
+- Open: Warden on servers that enforce it (its modules are x86 code).
 
 ## Rules of the road
 

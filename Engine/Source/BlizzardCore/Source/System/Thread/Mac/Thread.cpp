@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include "Engine/Source/BlizzardCore/Source/System/Lock/Lock.h"
 #include "Engine/Source/BlizzardCore/Source/System/Lock/Mac/Waitable.h"
+#include "Engine/Source/BlizzardCore/Source/System/Thread/Mac/SignalStack.h"
 #include "Engine/Source/BlizzardCore/Source/System/String/String.h"
 #include "Engine/Source/BlizzardCore/Source/System/Thread/Thread.h"
 #include "Engine/Source/BlizzardCore/Source/System/Thread/ThreadLocalStorage.h"
@@ -57,6 +58,7 @@ void CreateExternalExitKey() {
 // pthread entry for Blizzard::Thread::Create. ThreadStarter can free the record (Thread::Close), so the handle is
 // taken first; this function holds its own reference until the exit is signaled.
 void* PosixThreadEntry(void* param) {
+    MacThreadSignalStack signalStack;
     Blizzard::Thread::ThreadRecord* thread = static_cast<Blizzard::Thread::ThreadRecord*>(param);
     void* handle = thread->m_handle;
 
