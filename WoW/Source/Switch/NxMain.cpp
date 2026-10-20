@@ -5,6 +5,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <strings.h>
+#include <sys/iosupport.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include "WoW/Source/Switch/NxMain.h"
@@ -47,27 +48,44 @@ bool NxMainInitialize() {
     return true;
 }
 
+namespace {
+
+FILE* s_consoleFile;
+Mutex s_consoleLock;
+
+ssize_t ConsoleWrite(struct _reent* r, void* fd, const char* ptr, size_t len) {
+    mutexLock(&s_consoleLock);
+    fwrite(ptr, 1, len, s_consoleFile);
+    fflush(s_consoleFile);
+    mutexUnlock(&s_consoleLock);
+    return static_cast<ssize_t>(len);
+}
+
+devoptab_t s_consoleDevice;
+
+}
+
 void NxMainRedirectConsole() {
     if (s_nxlink >= 0) {
         return;
     }
 
     mkdir("Logs", 0777);
+    s_consoleFile = fopen("Logs/Console.txt", "w");
 
-    // Two streams on one file, both appending, so neither overwrites the other's lines.
-    FILE* file = fopen("Logs/Console.txt", "w");
-
-    if (file) {
-        fclose(file);
+    if (!s_consoleFile) {
+        return;
     }
 
-    if (freopen("Logs/Console.txt", "a", stdout)) {
-        setvbuf(stdout, nullptr, _IOLBF, 0);
-    }
-
-    if (freopen("Logs/Console.txt", "a", stderr)) {
-        setvbuf(stderr, nullptr, _IONBF, 0);
-    }
+    // newlib keeps stdout and stderr per thread, so freopen would only move the main thread's. Replacing the devices
+    // behind file descriptors 1 and 2, as nxlinkStdio does, moves every thread's.
+    mutexInit(&s_consoleLock);
+    s_consoleDevice.name = "con";
+    s_consoleDevice.write_r = ConsoleWrite;
+    devoptab_list[STD_OUT] = &s_consoleDevice;
+    devoptab_list[STD_ERR] = &s_consoleDevice;
+    setvbuf(stdout, nullptr, _IOLBF, 0);
+    setvbuf(stderr, nullptr, _IONBF, 0);
 }
 
 void NxMainShutdown() {

@@ -1,31 +1,34 @@
 /*
-    libnx audout output for FMOD Ex on the Nintendo Switch (wowdecomp). Polled like the CoreAudio output on macOS: FMOD
-    mixes into a ring of blocksize * numblocks samples, and a feeder thread copies the ring into audout buffers in
-    order, counting what it has handed over as played. getPosition reports that count, and the FMOD mixer thread fills
-    each block once the play cursor has passed it.
+    Audio renderer (audren) output for FMOD Ex on the Nintendo Switch (wowdecomp). Polled like the CoreAudio output on
+    macOS: FMOD mixes into a ring of blocksize * numblocks samples, and a feeder thread copies the ring into the wave
+    buffers of one renderer voice in order, counting what it has handed over as played. getPosition reports that count,
+    and the FMOD mixer thread fills each block once the play cursor has passed it.
 
-    audout plays 48 kHz stereo PCM16 only; other channel counts are folded to stereo as they are copied out.
+    The voice plays 48 kHz stereo PCM16; other channel counts are folded to stereo as they are copied out. (The simpler
+    audout service refuses to start for homebrew on some systems; the renderer is what SDL and most homebrew use.)
 */
 
-#ifndef _FMOD_OUTPUT_AUDOUT_H
-#define _FMOD_OUTPUT_AUDOUT_H
+#ifndef _FMOD_OUTPUT_AUDREN_H
+#define _FMOD_OUTPUT_AUDREN_H
 
 #include "fmod_settings.h"
 #include "fmod_output_polled.h"
 
 /* The platform's native output; it takes the slot CoreAudio has on macOS. */
-#define FMOD_OUTPUTTYPE_AUDOUT FMOD_OUTPUTTYPE_COREAUDIO
+#define FMOD_OUTPUTTYPE_AUDREN FMOD_OUTPUTTYPE_COREAUDIO
 
 namespace FMOD
 {
-    class OutputAudout : public OutputPolled
+    class OutputAudren : public OutputPolled
     {
       private:
 
-        enum { NUMHWBUFFERS = 3 };
+        enum { NUMHWBUFFERS = 4 };
 
-        void                       *mHwBuffer[NUMHWBUFFERS];
-        void                       *mHwDescriptor[NUMHWBUFFERS];  /* AudioOutBuffer */
+        void                       *mDriver;                      /* AudioDriver */
+        void                       *mPool;                        /* the wave buffers' memory */
+        size_t                      mPoolBytes;
+        void                       *mWaveBuf[NUMHWBUFFERS];       /* AudioDriverWaveBuf */
         unsigned int                mHwFrames;
         short                      *mBuffer;
         unsigned int                mBufferFrames;
@@ -34,7 +37,7 @@ namespace FMOD
         volatile unsigned int       mPlayed;
         volatile bool               mRunning;
         bool                        mThreadStarted;
-        bool                        mAudoutStarted;
+        bool                        mRendererStarted;              /* audrenInitialize succeeded */
         void                       *mThread;                      /* pthread_t */
 
         static void                *feederThread(void *param);

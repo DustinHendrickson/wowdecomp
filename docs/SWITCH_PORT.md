@@ -15,7 +15,7 @@ So the Switch port reuses most of `Mac/` and adds a `Switch/` folder only where 
 | Shared `Mac/` code | Small `#if defined(__SWITCH__)` / `__APPLE__` branches: clocks, thread names and priorities, file attributes, crash contexts, the executable path. `Base/Compat/Switch` supplies `<crt_externs.h>` and a `<dlfcn.h>` whose loads always fail. `Os/Switch/Posix.cpp` adds `pread`, `pwrite`, `sysconf` and friends that newlib lacks. |
 | Rendering | The decompiled OpenGL device, as on macOS (`CGxDeviceOpenGlMac.inl` is shared). Mesa's nouveau driver for the Tegra X1 through EGL, with a desktop GL **compatibility** context, which keeps the fixed-function pipeline and the ARB vertex / fragment programs (`arbvp1` / `arbfp1`) the Mac client used. Mesa exports no desktop GL symbols, so CMake generates a trampoline for every function in Mesa's `<GL/gl.h>` (`GlSwitchEntryPoints.cpp`), filled from `eglGetProcAddress`. Render targets use the same framebuffer-object pbuffer as macOS. The game draws its own (software) cursor. |
 | Screen | 1280x720, or 1920x1080 when docked and chosen in the video options; the system scales it to the display. |
-| Audio | FMOD Ex with the macOS POSIX OS / net layers and a new libnx `audout` output (`fmodex/switch/src`): 48 kHz stereo PCM16 fed from FMOD's ring buffer by a feeder thread; surround mixes fold to stereo. |
+| Audio | FMOD Ex with the macOS POSIX OS / net layers and a new output on libnx's audio renderer (`fmodex/switch/src`): one 48 kHz stereo PCM16 voice whose wave buffers a feeder thread fills from FMOD's ring; surround mixes fold to stereo. (The simpler `audout` service refused to start on hardware.) |
 | Network | The macOS `poll()` loop for `WowConnection`. The Switch has no pipes and its `poll` only takes sockets, so the wake-up "pipe" is a loopback UDP socket connected to itself. Socket buffers are raised at start (`WoW/Source/Switch/NxMain.cpp`). |
 | Input | `Os/Switch/Input.cpp` (game side) and `NxInput.cpp` (libnx side): controllers, the touch screen, USB keyboard and mouse, the software keyboard. See [Controls](#controls). |
 | Storage | The registry (`SReg`) is `Registry.txt` in the game folder. The clipboard is the game's own. |
@@ -44,7 +44,9 @@ sdmc:/switch/wow/WoW.nro
 sdmc:/switch/wow/Data/          <- the Data folder of a 3.3.5a (12340) client, about 17 GB
 ```
 
-The MPQs are the same as on Windows and macOS. None of the 3.3.5a archives is over 4 GB, so a FAT32 card works.
+The MPQs are the same as on Windows and macOS. None of the 3.3.5a archives is over 4 GB, so a FAT32 card works. Copy
+exactly the client's Data: an extra patch archive (a `patch-Z.MPQ` left from a UI mod, say) that replaces interface
+files makes the login screen report "GlueXML is modified or corrupt", as it would on Windows.
 Point `Data/<locale>/realmlist.wtf` at your server before copying. Settings (`WTF/`), logs, screenshots, AddOns and
 `Registry.txt` are written next to `WoW.nro`, as next to `Wow.exe`.
 
