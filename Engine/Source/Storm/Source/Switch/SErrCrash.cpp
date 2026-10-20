@@ -17,6 +17,7 @@ u32 __nx_exception_ignoredebug = 1;
 namespace {
 
 volatile bool s_crashReports;
+volatile bool s_crashing;
 SwitchCrashContext s_context;
 
 }
@@ -52,6 +53,13 @@ void SwitchShowErrorText(const char* title, const char* text) {
 
     snprintf(message, sizeof(message), "%s\n\n%s", title ? title : "", text ? text : "");
 
+    // From inside the exception handler a library applet can take the whole system down; the crash is in
+    // Errors/<date> Crash.txt and on stderr, and the game exits back to the Homebrew Menu.
+    if (s_crashing) {
+        fprintf(stderr, "%s\n", message);
+        return;
+    }
+
     // The applet's short text holds 0x800 bytes; the details field repeats the message for the "Details" page.
     if (R_SUCCEEDED(errorApplicationCreate(&config, message, message))) {
         errorApplicationShow(&config);
@@ -66,6 +74,7 @@ extern "C" void __libnx_exception_handler(ThreadExceptionDump* dump) {
         fatalThrow(MAKERESULT(Module_HomebrewAbi, 0x100 + (dump->error_desc & 0xFF)));
     }
 
+    s_crashing = true;
     s_context.type = dump->error_desc;
     s_context.esr = dump->esr;
     s_context.far = dump->far.x;

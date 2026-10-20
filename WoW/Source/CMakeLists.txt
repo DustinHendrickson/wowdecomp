@@ -78,6 +78,19 @@ if (WOWDECOMP_PLATFORM_SWITCH)
     # Wow.elf keeps the symbols: crash logs give addresses as offsets into it, for aarch64-none-elf-addr2line.
     set_target_properties(Wow PROPERTIES SUFFIX .elf)
 
+    # The commit a build came from, printed at the top of Logs/Console.txt to match a log to its Wow.elf.
+    execute_process(
+        COMMAND git -c safe.directory=* rev-parse --short HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE WOWDECOMP_BUILD_ID
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if (NOT WOWDECOMP_BUILD_ID)
+        set(WOWDECOMP_BUILD_ID unknown)
+    endif ()
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/Switch/NxMain.cpp PROPERTIES COMPILE_DEFINITIONS WOWDECOMP_BUILD_ID="${WOWDECOMP_BUILD_ID}")
+
     set(WOW_NACP ${CMAKE_CURRENT_BINARY_DIR}/Wow.nacp)
     set(WOW_NRO ${WOWDECOMP_BIN_DIR}/WoW.nro)
     set(WOW_ICON ${CMAKE_SOURCE_DIR}/Tools/Switch/icon.jpg)

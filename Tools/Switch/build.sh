@@ -10,8 +10,11 @@ docker image inspect $IMAGE >/dev/null 2>&1 || docker build -t $IMAGE "$ROOT/Too
 
 docker run --rm -v "$ROOT":/src -w /src $IMAGE sh -c '
     set -e
+    # Configured every time (it takes a moment) so the build ID in Logs/Console.txt names the current commit.
     if [ ! -f build/switch/build.ninja ]; then
         cmake -S . -B build/switch -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/SwitchToolchain.cmake -DCMAKE_BUILD_TYPE=Release
+    else
+        cmake -S . -B build/switch > /dev/null
     fi
     cmake --build build/switch "$@"
 ' sh "$@"

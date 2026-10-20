@@ -71,6 +71,10 @@ void NxMainRedirectConsole() {
     }
 
     mkdir("Logs", 0777);
+
+    // The previous run's output is kept, so a run that ends badly doesn't lose the one before it.
+    remove("Logs/Console-previous.txt");
+    rename("Logs/Console.txt", "Logs/Console-previous.txt");
     s_consoleFile = fopen("Logs/Console.txt", "w");
 
     if (!s_consoleFile) {
@@ -86,6 +90,8 @@ void NxMainRedirectConsole() {
     devoptab_list[STD_ERR] = &s_consoleDevice;
     setvbuf(stdout, nullptr, _IOLBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
+
+    fprintf(stderr, "World of Warcraft for Switch, build %s (%s %s)\n", WOWDECOMP_BUILD_ID, __DATE__, __TIME__);
 }
 
 void NxMainShutdown() {
