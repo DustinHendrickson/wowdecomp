@@ -6,6 +6,10 @@
 #if defined(_WIN32)
 #include <windows.h>
 #include <GL/gl.h>
+#elif defined(__SWITCH__)
+// Mesa's headers; its compatibility-profile entry points are reached through eglGetProcAddress
+// (CGxDeviceOpenGL/Switch/GlSwitchEntryPoints.cpp). glext.h comes with gl.h, without prototypes.
+#include <GL/gl.h>
 #else
 #define GL_SILENCE_DEPRECATION 1
 #include <OpenGL/gl.h>

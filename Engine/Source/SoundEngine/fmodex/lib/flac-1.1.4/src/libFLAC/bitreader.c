@@ -39,6 +39,8 @@
 #include <winsock.h> /* for ntohl() */
 #elif defined FLAC__SYS_DARWIN
 #include <machine/endian.h> /* for ntohl() */
+#elif defined __SWITCH__
+#include <arpa/inet.h> /* for ntohl() (wowdecomp: libnx has it there) */
 #else
 #include <netinet/in.h> /* for ntohl() */
 #endif

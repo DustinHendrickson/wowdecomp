@@ -1,7 +1,8 @@
 /*
     macOS port of fmodex/win32/src/fmod_os_misc.cpp (wowdecomp): memory, files, time, threads, critical sections,
     semaphores and libraries for FMOD Ex on POSIX. Time keeps the Win32 units: "ns" is microseconds there
-    (QueryPerformanceCounter * 1e6 / frequency), truncated to 32 bits.
+    (QueryPerformanceCounter * 1e6 / frequency), truncated to 32 bits. The Nintendo Switch build shares it: there,
+    semaphores are POSIX ones and libraries can't be loaded.
 */
 
 #include "fmod_settings.h"
@@ -9,8 +10,13 @@
 #include "fmod_os_misc.h"
 #include "fmod_memory.h"
 
+#if defined(__APPLE__)
 #include <dispatch/dispatch.h>
 #include <dlfcn.h>
+#else
+#include <semaphore.h>
+#endif
+#include <errno.h>
 #include <limits.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -27,7 +33,11 @@ struct FMOD_OS_CRITICALSECTION
 
 struct FMOD_OS_SEMAPHORE
 {
+#if defined(__APPLE__)
     dispatch_semaphore_t semaphore;
+#else
+    sem_t semaphore;
+#endif
 };
 
 int gSizeofCriticalSection = sizeof(FMOD_OS_CRITICALSECTION);
@@ -241,6 +251,7 @@ FMOD_RESULT FMOD_OS_Thread_Create(const char *name, THREAD_RETURNTYPE (THREAD_CA
         pthread_attr_setstacksize(&attributes, size);
     }
 
+#if defined(__APPLE__)
     /* Audio mixing gets the user-interactive class, the closest to Windows' time-critical / "Pro Audio" setting. */
     if (priority >= FMOD_THREAD_PRIORITY_HIGH)
     {
@@ -250,6 +261,7 @@ FMOD_RESULT FMOD_OS_Thread_Create(const char *name, THREAD_RETURNTYPE (THREAD_CA
     {
         pthread_attr_set_qos_class_np(&attributes, QOS_CLASS_UTILITY, 0);
     }
+#endif
 
     pthread_t thread;
     int created = pthread_create(&thread, &attributes, ThreadEntry, start);
@@ -334,7 +346,11 @@ FMOD_RESULT FMOD_OS_Semaphore_Create(FMOD_OS_SEMAPHORE **sema)
         return FMOD_ERR_MEMORY;
     }
 
+#if defined(__APPLE__)
     semaphore->semaphore = dispatch_semaphore_create(0);
+#else
+    sem_init(&semaphore->semaphore, 0, 0);
+#endif
     *sema = semaphore;
     return FMOD_OK;
 }
@@ -346,7 +362,11 @@ FMOD_RESULT FMOD_OS_Semaphore_Free(FMOD_OS_SEMAPHORE *sema)
         return FMOD_ERR_INVALID_PARAM;
     }
 
+#if defined(__APPLE__)
     dispatch_release(sema->semaphore);
+#else
+    sem_destroy(&sema->semaphore);
+#endif
     free(sema);
     return FMOD_OK;
 }
@@ -358,7 +378,13 @@ FMOD_RESULT FMOD_OS_Semaphore_Wait(FMOD_OS_SEMAPHORE *sema)
         return FMOD_ERR_INVALID_PARAM;
     }
 
+#if defined(__APPLE__)
     dispatch_semaphore_wait(sema->semaphore, DISPATCH_TIME_FOREVER);
+#else
+    while (sem_wait(&sema->semaphore) != 0 && errno == EINTR)
+    {
+    }
+#endif
     return FMOD_OK;
 }
 
@@ -369,13 +395,21 @@ FMOD_RESULT FMOD_OS_Semaphore_Signal(FMOD_OS_SEMAPHORE *sema, bool interrupt)
         return FMOD_ERR_INVALID_PARAM;
     }
 
+#if defined(__APPLE__)
     dispatch_semaphore_signal(sema->semaphore);
+#else
+    sem_post(&sema->semaphore);
+#endif
     return FMOD_OK;
 }
 
 FMOD_RESULT FMOD_OS_Library_Load(const char *dllname, FMOD_OS_LIBRARY **handle)
 {
+#if defined(__APPLE__)
     void *library = dlopen(dllname, RTLD_NOW | RTLD_LOCAL);
+#else
+    void *library = 0;      /* No dynamic libraries on the Switch. */
+#endif
 
     if (!library)
     {
@@ -388,13 +422,19 @@ FMOD_RESULT FMOD_OS_Library_Load(const char *dllname, FMOD_OS_LIBRARY **handle)
 
 FMOD_RESULT FMOD_OS_Library_GetProcAddress(FMOD_OS_LIBRARY *handle, const char *procname, void **address)
 {
+#if defined(__APPLE__)
     *address = dlsym((void *)handle, procname);
+#else
+    *address = 0;
+#endif
     return *address ? FMOD_OK : FMOD_ERR_FILE_UNWANTED;
 }
 
 FMOD_RESULT FMOD_OS_Library_Free(FMOD_OS_LIBRARY *handle)
 {
+#if defined(__APPLE__)
     dlclose((void *)handle);
+#endif
     return FMOD_OK;
 }
 

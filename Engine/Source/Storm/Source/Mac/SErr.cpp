@@ -5,8 +5,14 @@
 // the debugger or terminate. The dialog is a CFUserNotification alert, which works before (and without) an
 // NSApplication. Crashes arrive through sigaction handlers instead of an unhandled-exception filter. There are no
 // message-table resources, so error strings come from the built-in texts.
+//
+// The Switch build shares the file. There the dialog is the system error applet (one button, which takes the default
+// answer), and crashes come from libnx's exception handler (Storm/Source/Switch/SErrCrash.cpp) with a
+// SwitchCrashContext in place of the ucontext.
 
+#if defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
+#endif
 #include <cerrno>
 #include <csignal>
 #include <cstdarg>
@@ -15,11 +21,15 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
-#include <mach-o/dyld.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
 #include <sys/sysctl.h>
 #include <sys/ucontext.h>
-#include <unistd.h>
+#else
+#include "Engine/Source/Storm/Source/Switch/CrashContext.h"
+#endif
 #include "Engine/Source/BlizzardCore/Source/System/Process/Process.h"
 #include "Engine/Source/Storm/Source/Mac/SystemTime.h"
 #include "Engine/Source/Storm/Source/MachineState.h"
@@ -102,6 +112,10 @@ int32_t (STORMAPI* s_logCallback)(char*, uint32_t);
 uint32_t s_noMiniDumps;
 char s_logLastFile[MAX_PATH];
 
+#if defined(__SWITCH__)
+typedef SwitchCrashContext ucontext_t;
+#endif
+
 // Set by the crash handler for the error it reports: the faulting thread's ucontext.
 ucontext_t* s_crashContext;
 
@@ -125,11 +139,15 @@ void InternalLeaveCriticalSection(CRITICAL_SECTION* critsect) {
 }
 
 int32_t CanBreakToDebugger() {
+#if defined(__SWITCH__)
+    return 0;
+#else
     kinfo_proc info = {};
     int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
     size_t size = sizeof(info);
 
     return sysctl(mib, 4, &info, &size, nullptr, 0) == 0 && (info.kp_proc.p_flag & P_TRACED) != 0;
+#endif
 }
 
 void Breakpoint() {
@@ -271,6 +289,12 @@ int32_t UndecorateObjectName(const char* source, char* dest, uint32_t destchars)
     return 1;
 }
 
+#if defined(__SWITCH__)
+int32_t ShowAlert(const char* title, const char* text, bool warning, const char* const* buttons, const int32_t* results, int32_t buttonCount) {
+    SwitchShowErrorText(title, text);
+    return results[0];
+}
+#else
 CFStringRef MakeString(const char* text) {
     CFStringRef string = CFStringCreateWithCString(kCFAllocatorDefault, text, kCFStringEncodingUTF8);
     return string ? string : CFStringCreateWithCString(kCFAllocatorDefault, text, kCFStringEncodingMacRoman);
@@ -312,6 +336,9 @@ int32_t ShowAlert(const char* title, const char* text, bool warning, const char*
     }
 }
 
+#endif
+
+#if defined(__APPLE__)
 const char* SignalName(int signal) {
     switch (signal) {
         case SIGSEGV:
@@ -358,6 +385,7 @@ void CrashHandler(int signal, siginfo_t* info, void* param) {
 
     // SA_RESETHAND restored the default action; returning re-runs the fault and ends the process with the signal.
 }
+#endif
 
 }
 
@@ -478,9 +506,14 @@ int32_t STORMAPI SErrDisplayError(uint32_t errorcode, const char* filename, int3
     uint32_t pathsize = sizeof(appfilename);
     appfilename[0] = 0;
 
+#if defined(__SWITCH__)
+    (void)pathsize;
+    SStrCopy(appfilename, "World of Warcraft", sizeof(appfilename));
+#else
     if (_NSGetExecutablePath(appfilename, &pathsize) != 0) {
         appfilename[0] = 0;
     }
+#endif
 
     const char* base = strrchr(appfilename, '/');
     SStrCopy(appname, base ? base + 1 : appfilename, sizeof(appname));
@@ -742,6 +775,36 @@ int32_t SErrDisplayErrorFmt(uint32_t errorcode, const char* filename, int32_t li
     return SErrDisplayError(errorcode, filename, linenumber, buffer, recoverable, exitcode, 0x11111111);
 }
 
+#if defined(__SWITCH__)
+void SwitchReportCrash(SwitchCrashContext* context) {
+    InternalEnterCriticalSection(&s_exceptioncritsect);
+
+    if (!s_crashContext) {
+        s_crashContext = context;
+    }
+
+    InternalLeaveCriticalSection(&s_exceptioncritsect);
+
+    void* pc = reinterpret_cast<void*>(context->pc);
+    char buffer[120];
+    char message[256];
+    message[0] = 0;
+    SStrPrintf(buffer, sizeof(buffer), "0x%08X (%s) at %p", context->type, SwitchCrashTypeName(context->type), pc);
+
+    if (context->type == SWITCH_CRASH_DATA_ABORT) {
+        // ESR bit 6 (WnR) tells a faulting write from a read.
+        bool written = (context->esr >> 6) & 1;
+        SStrPrintf(message, sizeof(message), GetErrorString(SERR_STR_ACCESS_VIOLATION), pc, reinterpret_cast<void*>(context->far), GetErrorString(written ? SERR_STR_WRITTEN : SERR_STR_READ));
+    }
+
+    SErrDisplayError(STORM_ERROR_FATAL, buffer, SLOG_EXCEPTION, message, 0, 1, 0x11111111);
+}
+
+void STORMAPI SErrCatchUnhandledExceptions() {
+    // libnx's exception handler is always installed (Storm/Source/Switch/SErrCrash.cpp); this arms it.
+    SwitchEnableCrashReports();
+}
+#else
 void STORMAPI SErrCatchUnhandledExceptions() {
     // The handler runs on its own stack so a stack overflow can still be reported.
     static uint8_t s_alternateStack[256 * 1024];
@@ -764,6 +827,7 @@ void STORMAPI SErrCatchUnhandledExceptions() {
     // doesn't see these either, but on macOS they are worth a log.
     sigaction(SIGABRT, &action, nullptr);
 }
+#endif
 
 void SErrDisplayAppFatalMessage(const char* message, const char* filename, int32_t linenumber) {
     SErrPrepareAppFatal(filename, linenumber);

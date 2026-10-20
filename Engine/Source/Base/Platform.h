@@ -1,7 +1,7 @@
 #ifndef ENGINE_SOURCE_BASE_PLATFORM_H
 #define ENGINE_SOURCE_BASE_PLATFORM_H
 
-// Portability shim for non-Windows builds (macOS arm64).
+// Portability shim for non-Windows builds (macOS arm64, Nintendo Switch).
 //
 // The build force-includes this header into every project source on macOS (cmake/Platform.cmake), so shared code
 // can keep the Windows types, calling conventions, intrinsics and CRT names it was decompiled with. It is a no-op on
@@ -16,7 +16,9 @@
 #include <ctype.h>
 #include <errno.h>
 #include <pthread.h>
+#if defined(__APPLE__)
 #include <malloc/malloc.h>
+#endif
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -24,6 +26,59 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#if !defined(__APPLE__)
+// After <stdlib.h>: newlib's <malloc.h> redeclares malloc and free without its exception specifications.
+#include <malloc.h>
+#endif
+
+#if defined(__SWITCH__)
+#include <time.h>
+
+// Darwin calls the shared Mac/ layers use, on the Switch. The clock is the ARM generic timer (19.2 MHz), which libnx's
+// armGetSystemTick reads too; <switch.h> isn't included here because its names (Handle, Event, ...) collide with the
+// game's.
+#define CLOCK_UPTIME_RAW CLOCK_MONOTONIC
+#if !defined(CLOCK_MONOTONIC_RAW)
+#define CLOCK_MONOTONIC_RAW CLOCK_MONOTONIC
+#endif
+
+static inline uint64_t clock_gettime_nsec_np(int clock) {
+    (void)clock;
+    uint64_t ticks;
+    __asm__ __volatile__("mrs %0, cntpct_el0" : "=r"(ticks));
+    // 1e9 / 19.2e6 = 625 / 12, split so the product can't overflow.
+    return (ticks / 12) * 625 + ((ticks % 12) * 625) / 12;
+}
+
+// newlib has no timegm.
+static inline time_t wowdecomp_timegm(struct tm* parts) {
+    // Days from 1970-01-01 to the date (civil-from-days, proleptic Gregorian), then the time of day.
+    int64_t year = (int64_t)parts->tm_year + 1900 + parts->tm_mon / 12;
+    int64_t month = parts->tm_mon % 12;
+
+    if (month < 0) {
+        month += 12;
+        year--;
+    }
+
+    year -= month < 2;
+    int64_t era = (year >= 0 ? year : year - 399) / 400;
+    int64_t yearOfEra = year - era * 400;
+    int64_t dayOfYear = (153 * (month + (month < 2 ? 10 : -2)) + 2) / 5 + parts->tm_mday - 1;
+    int64_t dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear;
+    int64_t days = era * 146097 + dayOfEra - 719468;
+
+    return (time_t)(days * 86400 + parts->tm_hour * 3600 + parts->tm_min * 60 + parts->tm_sec);
+}
+
+#define timegm(parts) wowdecomp_timegm(parts)
+
+// Thread names and Mach thread ports: neither exists on the Switch. The thread id is the pthread's, truncated.
+#define pthread_setname_np(...) 0
+static inline uint32_t pthread_mach_thread_np(pthread_t thread) {
+    return (uint32_t)(uintptr_t)thread;
+}
+#endif
 
 // Calling conventions: meaningful on x86 only. Windows x64 ignores them too.
 #define __stdcall
@@ -181,7 +236,11 @@ static inline unsigned char _BitScanReverse(uint32_t* index, uint32_t mask) {
 #define _alloca alloca
 #define _finite(x) isfinite(x)
 #define _isnan(x) isnan(x)
+#if defined(__APPLE__)
 #define _msize(p) malloc_size(p)
+#else
+#define _msize(p) malloc_usable_size(p)
+#endif
 #define _hypot hypot
 #define _copysign copysign
 #define _atoi64 atoll
@@ -233,6 +292,14 @@ static inline void wowdecomp_srand(unsigned int seed) {
 #define RAND_MAX 0x7FFF
 #define rand() wowdecomp_rand()
 #define srand(seed) wowdecomp_srand(seed)
+
+#if defined(__cplusplus)
+// libstdc++'s algorithms call std::rand() (std::random_shuffle), which the macro turns into std::wowdecomp_rand().
+namespace std {
+using ::wowdecomp_rand;
+using ::wowdecomp_srand;
+}
+#endif
 
 // MSVC's _cexit runs atexit handlers and flushes streams without ending the process; Storm then calls _exit.
 // POSIX has no way to run atexit handlers alone, so this only flushes. The Mac Storm layer should call exit() instead.

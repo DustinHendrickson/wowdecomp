@@ -9,6 +9,20 @@
 #include <csignal>
 #include <cstdlib>
 
+#if defined(__SWITCH__)
+
+// The Switch has no signals: crashes reach libnx's exception handler, which runs on its own stack.
+class MacThreadSignalStack {
+    public:
+    MacThreadSignalStack() {
+    }
+
+    MacThreadSignalStack(const MacThreadSignalStack&) = delete;
+    MacThreadSignalStack& operator=(const MacThreadSignalStack&) = delete;
+};
+
+#else
+
 class MacThreadSignalStack {
     public:
     MacThreadSignalStack() {
@@ -42,5 +56,7 @@ class MacThreadSignalStack {
 
     stack_t m_stack;
 };
+
+#endif
 
 #endif

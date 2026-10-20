@@ -1,4 +1,5 @@
-// macOS implementation of Blizzard::Process (Win64/Process.cpp).
+// macOS implementation of Blizzard::Process (Win64/Process.cpp). The Switch build shares it: there the process path is
+// the NRO the loader names in argv[0], and child processes can't be started.
 
 #include <algorithm>
 #include <cerrno>
@@ -6,9 +7,12 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <mach-o/dyld.h>
+#include <crt_externs.h>
 #include <pthread.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
 #include <spawn.h>
+#endif
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -51,6 +55,11 @@ bool Blizzard::Process::GetProcessPath(char* buffer, int32_t buffersize) {
         return false;
     }
 
+#if defined(__SWITCH__)
+    const char* argv0 = *_NSGetArgc() > 0 && (*_NSGetArgv())[0] ? (*_NSGetArgv())[0] : "";
+    Blizzard::String::Copy(buffer, argv0, buffersize);
+    return true;
+#else
     char path[PATH_MAX];
     uint32_t length = sizeof(path);
 
@@ -63,6 +72,7 @@ bool Blizzard::Process::GetProcessPath(char* buffer, int32_t buffersize) {
     Blizzard::String::Copy(buffer, realpath(path, resolved) ? resolved : path, buffersize);
 
     return true;
+#endif
 }
 
 namespace {
@@ -139,9 +149,13 @@ bool Blizzard::Process::LaunchChildProcessWithArguments(const char* path, const 
 
     pid_t process;
 
+#if defined(__SWITCH__)
+    return false;
+#else
     if (posix_spawn(&process, path, nullptr, nullptr, argv.data(), environ) != 0) {
         return false;
     }
+#endif
 
     if (!callback) {
         return true;

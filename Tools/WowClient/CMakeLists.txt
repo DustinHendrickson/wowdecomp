@@ -1,6 +1,9 @@
 file(GLOB CLIENT_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/WoW/Source/*.cpp")
 
-if (WOWDECOMP_PLATFORM_MAC)
+if (WOWDECOMP_PLATFORM_SWITCH)
+    # The Switch runs one executable: WoW/Source builds Wow.elf and WoW.nro.
+    return ()
+elseif (WOWDECOMP_PLATFORM_MAC)
     file(GLOB CLIENT_PLATFORM_SOURCES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/WoW/Source/Mac/*.cpp" "${CMAKE_SOURCE_DIR}/WoW/Source/Mac/*.mm")
     set(WOWCLIENT_OUTPUT_NAME WowClient)
 elseif (WOWDECOMP_ARCH_64)

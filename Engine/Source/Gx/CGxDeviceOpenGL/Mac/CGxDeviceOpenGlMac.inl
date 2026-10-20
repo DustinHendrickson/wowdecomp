@@ -6,6 +6,10 @@
 // m_hglrc the NSOpenGLContext. The window tells the device about size and focus changes through a listener, where
 // Windows sends WM_SIZE / WM_SETFOCUS to WindowProcGl. The pbuffer behind texture render targets is a framebuffer
 // object (MacGlCreatePbuffer). Fullscreen is a borderless window over the desktop at its current resolution.
+//
+// The Switch shares this file: its Os layer implements the same window interface for the console's screen, and its
+// MacGlContext / GlMac functions are EGL ones (CGxDeviceOpenGL/Switch). It has no system cursor, so the device draws
+// the game's.
 
 #include <algorithm>
 #include "Engine/Source/Gx/CGxDeviceOpenGL/Mac/MacGlContext.h"
@@ -30,6 +34,11 @@ CRect ContentRect(void* window) {
 
 // Fullscreen, and the two borderless "maximized" modes Windows creates as WS_POPUP windows over the screen.
 bool IsFullscreen(const CGxFormat& format) {
+#if defined(__SWITCH__)
+    // The game always fills the Switch's screen.
+    return true;
+#endif
+
     return !format.m_window || format.m_maximize == 1 || format.m_maximize == 2;
 }
 
@@ -165,6 +174,7 @@ void CGxDeviceOpenGl::DeviceDestroy() {
     s_deviceChanging = 0;
 }
 
+#if defined(WOWDECOMP_PLATFORM_MAC)
 void CGxDeviceOpenGl::ApplyMacCursor() {
     if (!this->m_hwnd) {
         return;
@@ -186,6 +196,7 @@ void CGxDeviceOpenGl::CursorUnlock(uint32_t x, uint32_t y) {
     CGxDevice::CursorUnlock(x, y);
     this->ApplyMacCursor();
 }
+#endif
 
 void CGxDeviceOpenGl::DeviceSetGamma(float gamma) {
     CGxDevice::DeviceSetGamma(gamma);
@@ -219,11 +230,15 @@ int32_t CGxDeviceOpenGl::IDevAttachGlContext(const CGxFormat& format) {
         this->ISetCaps(format);
         this->DeviceCreatePbuffer();
 
+#if defined(WOWDECOMP_PLATFORM_MAC)
         // The system cursor shows the game's cursor (CursorUnlock), at its usual size whatever the render scale.
         // gxCursor 0 keeps the device's software cursor, with the system one hidden over the window.
         this->m_caps.m_hwCursor = 1;
         this->ICursorCreate(format);
         this->ApplyMacCursor();
+#else
+        this->ICursorCreate(format);
+#endif
         this->IStateSetContextDefaults();
         this->IRsSync(1);
         this->IShaderConstantsClear();

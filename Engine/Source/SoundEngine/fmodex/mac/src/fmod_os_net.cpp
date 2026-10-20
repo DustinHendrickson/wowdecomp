@@ -7,6 +7,7 @@
 #include "fmod.h"
 #include "fmod_os_net.h"
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>

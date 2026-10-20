@@ -53,8 +53,10 @@ if (WOWDECOMP_PLATFORM_WIN)
         WIN32_LEAN_AND_MEAN
         _CRT_SECURE_NO_WARNINGS
     )
+elseif (WOWDECOMP_PLATFORM_SWITCH)
+    add_compile_definitions(WOWDECOMP_PLATFORM_SWITCH=1 WOWDECOMP_PLATFORM_POSIX=1)
 else ()
-    add_compile_definitions(WOWDECOMP_PLATFORM_MAC=1)
+    add_compile_definitions(WOWDECOMP_PLATFORM_MAC=1 WOWDECOMP_PLATFORM_POSIX=1)
 endif ()
 
 # Off by default: the client checks MPQ file MD5s (signaturefile) and GlueXML/FrameXML/AddOn .toc.sig files like the
@@ -69,7 +71,7 @@ if (EXISTS ${CMAKE_SOURCE_DIR}/ThirdParty/CMakeLists.txt)
     add_subdirectory(ThirdParty)
 endif ()
 
-if (WOWDECOMP_PLATFORM_MAC)
+if (WOWDECOMP_PLATFORM_POSIX)
     wowdecomp_mac_compile_options()
 endif ()
 

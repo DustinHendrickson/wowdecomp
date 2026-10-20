@@ -3,6 +3,10 @@
 
 // The macOS game window, for the Mac Gx device (Windows' Gx devices create their own HWND with CreateWindowEx).
 //
+// The Switch implements the same interface (Os/Switch/Input.cpp): there the window is the console's screen, a libnx
+// NWindow whose size is fixed while the game runs, and it never moves, minimizes or loses focus except when the HOME
+// menu takes the screen.
+//
 // The window is an NSWindow whose content view feeds keyboard, text, mouse, focus, size and close events into the Os
 // input queue, producing the same OSINPUT events OsWindowProc makes from window messages on Windows. Positions and sizes
 // are render pixels with the origin at the top left of the content area, like a Win32 client area: backing pixels with
@@ -60,5 +64,10 @@ enum OsMacWindowEvent {
 typedef void (*OsMacWindowListener)(void* param, OsMacWindowEvent event);
 
 void OsMacSetWindowListener(void* window, OsMacWindowListener listener, void* param);
+
+#if defined(__SWITCH__)
+// The screen in pixels: 1920x1080 docked, 1280x720 handheld, as of when the game started.
+void OsMacGetScreenSize(int32_t* width, int32_t* height);
+#endif
 
 #endif

@@ -67,6 +67,14 @@
         #define PLATFORM_IPHONE_SIMULATOR
     #endif
 
+#elif defined(__SWITCH__)
+
+    /* wowdecomp: the Nintendo Switch build shares the macOS port's POSIX layer, with its own audio output. */
+    #define PLATFORM_MAC
+    #define PLATFORM_SWITCH
+    #define PLATFORM_64BIT
+    #define PLATFORM_ENDIAN_LITTLE
+
 #elif defined(__MACH__)
 
     #define PLATFORM_MAC   
@@ -690,8 +698,10 @@
 
 #elif defined(PLATFORM_MAC)
 
+    #if !defined(PLATFORM_SWITCH)
     #define FMOD_SUPPORT_COREAUDIO
     #define FMOD_SUPPORT_VSTPLUGIN   
+    #endif
     #define FMOD_SUPPORT_PRAGMAPACK
     #define FMOD_SUPPORT_NEURAL
 

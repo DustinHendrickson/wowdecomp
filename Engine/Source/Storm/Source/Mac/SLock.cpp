@@ -145,6 +145,10 @@ int32_t SThread::SetPriority(int32_t priority) {
         return 0;
     }
 
+#if defined(__SWITCH__)
+    // newlib on the Switch has no POSIX scheduling calls; threads keep the priority they were created with.
+    return 1;
+#else
     int32_t minimum = sched_get_priority_min(SCHED_OTHER);
     int32_t maximum = sched_get_priority_max(SCHED_OTHER);
     int32_t normal = (minimum + maximum) / 2;
@@ -154,6 +158,7 @@ int32_t SThread::SetPriority(int32_t priority) {
     param.sched_priority = normal + (priority - 2) * step;
 
     return pthread_setschedparam(native, SCHED_OTHER, &param) == 0;
+#endif
 }
 
 CSRWLock::CSRWLock() {

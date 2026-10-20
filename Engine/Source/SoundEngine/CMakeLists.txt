@@ -22,6 +22,16 @@ if (WOWDECOMP_PLATFORM_WIN)
         "${FMODEX_PLATFORM_DIR}/asio/*.cpp"
         "${FMODEX_DIR}/lib/openal/utils/*.cpp"
     )
+elseif (WOWDECOMP_PLATFORM_SWITCH)
+    # The macOS OS and net layers are POSIX and shared; the output is libnx audout instead of CoreAudio.
+    set(FMODEX_PLATFORM_DIR ${FMODEX_DIR}/switch/src)
+    file(GLOB FMODEX_PLATFORM_SOURCES CONFIGURE_DEPENDS "${FMODEX_PLATFORM_DIR}/*.cpp")
+    list(APPEND FMODEX_PLATFORM_SOURCES
+        ${FMODEX_DIR}/mac/src/fmod_os_misc.cpp
+        ${FMODEX_DIR}/mac/src/fmod_os_net.cpp
+        ${FMODEX_DIR}/win32/src/fmod_dsp_resampler_linear.cpp
+        ${FMODEX_DIR}/win32/src/fmod_dsp_distortion.cpp
+    )
 else ()
     set(FMODEX_PLATFORM_DIR ${FMODEX_DIR}/mac/src)
     file(GLOB FMODEX_PLATFORM_SOURCES CONFIGURE_DEPENDS

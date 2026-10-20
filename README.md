@@ -52,6 +52,11 @@ On macOS (Apple Silicon; port notes in [docs/MACOS_PORT.md](docs/MACOS_PORT.md))
 - The `Data` folder of a 3.3.5a client. The MPQs are the same on every platform, so a Windows install's `Data`
   works.
 
+On the Nintendo Switch (homebrew; port notes, controls and status in [docs/SWITCH_PORT.md](docs/SWITCH_PORT.md)):
+
+- Docker, to build (the toolchain is devkitPro's devkitA64 with Clang, in `Tools/Switch/Dockerfile`)
+- A Switch that runs homebrew, and the `Data` folder of a 3.3.5a client on its SD card
+
 ## Building
 
 From a Developer PowerShell or any shell with `cmake` on `PATH`:
@@ -96,6 +101,15 @@ and `World of Warcraft.app` (the app bundle) into `bin/Mac/Apps.noindex/`, a fol
 you install shows up in Spotlight and Launchpad. The Mac-only self-tests `NetTest` and `SoundTest` build into `bin/Mac/`,
 and `OsWindowTest.app` and `GxDrawTest.app` into `bin/Mac/Apps.noindex/`.
 
+### Nintendo Switch
+
+```bash
+Tools/Switch/build.sh
+```
+
+This builds in Docker and writes `bin/Switch/WoW.nro`, the homebrew executable, and `bin/Switch/Wow.elf`, the same
+program with symbols for reading crash logs. Not yet tested on hardware.
+
 ### Options
 
 | CMake option | Default | Effect |
@@ -133,6 +147,14 @@ Settings, logs, screenshots and AddOns live in that folder, as with `Wow.exe`. N
   aren't run (as in the Windows x64 build), so use a server with Warden turned off.
 - For development, `bin/Mac/WowClient` runs in place with `Data` linked into `bin/Mac/` and prints its log to the
   terminal.
+
+On the Nintendo Switch:
+
+1. Copy `WoW.nro` to `sdmc:/switch/wow/` and your 3.3.5a `Data` folder next to it (`sdmc:/switch/wow/Data/`), with
+   `realmlist.wtf` pointing at your server.
+2. Start the Homebrew Menu over a game (hold R while starting any game), not from the album: the game needs the memory
+   only a game gets.
+3. Pick World of Warcraft. Controls are in [docs/SWITCH_PORT.md](docs/SWITCH_PORT.md#controls).
 
 ## Layout
 

@@ -9,7 +9,9 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#if defined(__APPLE__)
 #include <execinfo.h>
+#endif
 #include <pthread.h>
 #include <sched.h>
 #include <unistd.h>
@@ -70,6 +72,7 @@ void* PosixThreadEntry(void* param) {
     return nullptr;
 }
 
+#if defined(__APPLE__)
 // Blizzard levels 0 (idle) .. 6 (time critical) onto the SCHED_OTHER range, level 3 being the default priority.
 int32_t NativePriority(int32_t level) {
     int32_t minimum = sched_get_priority_min(SCHED_OTHER);
@@ -79,6 +82,7 @@ int32_t NativePriority(int32_t level) {
 
     return normal + (level - 3) * step;
 }
+#endif
 
 }
 
@@ -102,10 +106,15 @@ bool System_Thread::SetPriorityLevel(Blizzard::Thread::ThreadRecord* thread, int
         return false;
     }
 
+#if defined(__SWITCH__)
+    // newlib on the Switch has no POSIX scheduling calls; threads keep the priority they were created with.
+    return true;
+#else
     sched_param param;
     param.sched_priority = NativePriority(level);
 
     return pthread_setschedparam(native, SCHED_OTHER, &param) == 0;
+#endif
 }
 
 bool System_Thread::GetPriorityLevel(Blizzard::Thread::ThreadRecord* thread, int32_t* level) {
@@ -228,11 +237,16 @@ bool System_Thread::AllocateTLSSlot(Blizzard::Thread::TLSSlot* slot, Blizzard::T
 
 void System_Thread::InitStackTraceEntryPoint() {
     // Same frame as RtlCaptureStackBackTrace(2, 1, ...): skip this function and ThreadStarter.
+#if defined(__SWITCH__)
+    // No backtrace(); the frame records hold the same return address.
+    SetStackTraceEntryPoint(__builtin_return_address(1));
+#else
     void* frames[3];
 
     if (backtrace(frames, 3) == 3) {
         SetStackTraceEntryPoint(frames[2]);
     }
+#endif
 }
 
 uint32_t System_Thread::ExternalTLSWatcher(void* param) {

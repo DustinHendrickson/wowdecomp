@@ -2,16 +2,22 @@
 //
 // OsGetProcessorId / OsGetOsId keep the Windows values ('x86', 'Win'): they go into the login challenge, and this
 // client speaks the Windows client's protocol (version checks, Warden), not the Mac client's.
+//
+// The Switch build shares this file; its libnx calls are in Os/Switch/NxSystem.cpp.
 
 #include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#if defined(__APPLE__)
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
 #include <pwd.h>
 #include <spawn.h>
 #include <sys/sysctl.h>
+#else
+#include "Engine/Source/Os/Switch/NxSystem.h"
+#endif
 #include <unistd.h>
 #include "Engine/Source/BlizzardCore/Source/System/Lock/Mac/Waitable.h"
 #include "Engine/Source/Os/OsFile.h"
@@ -20,7 +26,13 @@
 #include "Engine/Source/Os/TimeManager.h"
 #include "Engine/Source/Storm/H/storm.h"
 
+#if defined(__APPLE__)
 extern char** environ;
+#else
+// The code segment, from libnx's linker script.
+extern "C" char __code_start[];
+extern "C" char __rodata_start[];
+#endif
 
 static int32_t s_sleepInBackground = 1;
 static const char* s_osTypeNames[] = { "Unknown", "Win95", "Win95OSR2", "Win98", "Win98SE", "WinME", "WinNT4", "Win2000", "WinXP", "Win2003", "Win9X_Other", "WinNT_Other", "MacOS9", "MacOSX", "Linux", "WinVista" };
@@ -38,9 +50,14 @@ static uint64_t s_cpuTicksPerSecond;
 namespace {
 
 uint32_t SysctlCount(const char* name) {
+#if defined(__APPLE__)
     uint32_t value = 0;
     size_t size = sizeof(value);
     return sysctlbyname(name, &value, &size, nullptr, 0) == 0 ? value : 0;
+#else
+    // Applications get three of the Tegra X1's four Cortex-A57 cores; the fourth belongs to the system.
+    return 3;
+#endif
 }
 
 uint8_t HexValue(char c) {
@@ -64,8 +81,12 @@ uint8_t HexValue(char c) {
 int32_t IOsGetProcessorFeatures(CpuIdInfo* info) {
     // No CPUID on arm64: report the brand string and leave the CPUID leaves empty.
     memset(info, 0, sizeof(CpuIdInfo));
+#if defined(__APPLE__)
     size_t size = sizeof(info->m_brand) - 1;
     sysctlbyname("machdep.cpu.brand_string", info->m_brand, &size, nullptr, 0);
+#else
+    SStrCopy(info->m_brand, "NVIDIA Tegra X1 (ARM Cortex-A57)", sizeof(info->m_brand));
+#endif
 
     return 0;
 }
@@ -129,6 +150,12 @@ uint32_t OsGetOsId() {
 }
 
 int32_t OsGetComputerName(char* buffer, uint32_t* size) {
+#if defined(__SWITCH__)
+    SStrCopy(buffer, "Switch", *size);
+    *size = static_cast<uint32_t>(strlen(buffer));
+    return 1;
+#endif
+
     if (gethostname(buffer, *size) != 0) {
         return 0;
     }
@@ -140,24 +167,38 @@ int32_t OsGetComputerName(char* buffer, uint32_t* size) {
 }
 
 int32_t OsGetUserName(char* buffer, uint32_t* size) {
+#if defined(__SWITCH__)
+    const char* name = "Player";
+#else
     passwd* user = getpwuid(getuid());
 
-    if (!user || !user->pw_name || strlen(user->pw_name) + 1 > *size) {
+    if (!user || !user->pw_name) {
         return 0;
     }
 
-    SStrCopy(buffer, user->pw_name, *size);
+    const char* name = user->pw_name;
+#endif
+
+    if (strlen(name) + 1 > *size) {
+        return 0;
+    }
+
+    SStrCopy(buffer, name, *size);
     *size = static_cast<uint32_t>(strlen(buffer) + 1);
 
     return 1;
 }
 
 uint64_t OsGetPhysicalMemory() {
+#if defined(__SWITCH__)
+    return NxGetTotalMemory();
+#else
     uint64_t memory = 0;
     size_t size = sizeof(memory);
     sysctlbyname("hw.memsize", &memory, &size, nullptr, 0);
 
     return memory;
+#endif
 }
 
 void* CreateNamedEventA(const char* name, int32_t manualReset) {
@@ -166,6 +207,11 @@ void* CreateNamedEventA(const char* name, int32_t manualReset) {
 }
 
 void OsFindTextSectionBounds() {
+#if defined(__SWITCH__)
+    s_textStart = reinterpret_cast<uintptr_t>(__code_start);
+    s_textEnd = reinterpret_cast<uintptr_t>(__rodata_start);
+    return;
+#else
     unsigned long size = 0;
     const mach_header_64* header = reinterpret_cast<const mach_header_64*>(_dyld_get_image_header(0));
     uint8_t* text = getsectiondata(header, "__TEXT", "__text", &size);
@@ -176,6 +222,7 @@ void OsFindTextSectionBounds() {
 
     s_textStart = reinterpret_cast<uintptr_t>(text);
     s_textEnd = s_textStart + size;
+#endif
 }
 
 void OsValidateFunctionPointer(const void* ptr) {
@@ -228,10 +275,14 @@ int32_t OsLaunchURL(const char* url) {
 
     *dst = '\0';
 
+#if defined(__SWITCH__)
+    return NxOpenURL(file);
+#else
     char* argv[] = { const_cast<char*>("/usr/bin/open"), file, nullptr };
     pid_t process;
 
     return posix_spawn(&process, "/usr/bin/open", nullptr, nullptr, argv, environ) == 0;
+#endif
 }
 
 uint32_t OsGetProcessorFeaturesEx(int32_t& vendor) {

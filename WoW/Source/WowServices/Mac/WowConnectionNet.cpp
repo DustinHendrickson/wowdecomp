@@ -6,7 +6,11 @@
 // Windows ones: 2 for readable, accept or close, 1 for writable or connected, 8 while disconnecting. poll is
 // level-triggered, but a connection being serviced (m_serviceCount) is left out of the set, as on Windows, so a
 // pending read doesn't spin the loop.
+//
+// The Switch build shares the file. Its poll only takes sockets and it has no pipes, so the wake-up "pipe" there is a
+// UDP socket on the loopback address, connected to itself: a datagram sent to it makes it readable.
 
+#include <arpa/inet.h>
 #include <cerrno>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -36,6 +40,34 @@ void Wake(void* event) {
         // A full pipe already has a wake-up pending.
         (void)write(Pipe(event)->m_write, &byte, 1);
     }
+}
+
+int MakeWakePipe(int fds[2]) {
+#if defined(__SWITCH__)
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (sock < 0) {
+        return -1;
+    }
+
+    sockaddr_in address = {};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    socklen_t length = sizeof(address);
+
+    if (bind(sock, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 ||
+        getsockname(sock, reinterpret_cast<sockaddr*>(&address), &length) != 0 ||
+        connect(sock, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
+        close(sock);
+        return -1;
+    }
+
+    fds[0] = sock;
+    fds[1] = sock;
+    return 0;
+#else
+    return pipe(fds);
+#endif
 }
 
 void Drain(void* event) {
@@ -163,7 +195,7 @@ void WowConnectionNet::PlatformRun() {
 void WowConnectionNet::PlatformInit(bool useEngine) {
     int fds[2];
 
-    if (pipe(fds) != 0) {
+    if (MakeWakePipe(fds) != 0) {
         return;
     }
 
@@ -209,7 +241,10 @@ void WowConnectionNet::PlatformDestroy() {
 
     if (wake) {
         close(wake->m_read);
-        close(wake->m_write);
+
+        if (wake->m_write != wake->m_read) {
+            close(wake->m_write);
+        }
         delete wake;
         this->m_event = nullptr;
     }

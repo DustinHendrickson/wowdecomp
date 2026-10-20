@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#if defined(__APPLE__)
 #include <sys/sysctl.h>
+#endif
 #include <unistd.h>
 #include "Engine/Source/BlizzardCore/Source/System/Debug/Debug.h"
 #include "Engine/Source/BlizzardCore/Source/System/File/File.h"
@@ -17,11 +19,15 @@ static bool s_continueAfterAssert;
 namespace {
 
 bool DebuggerAttached() {
+#if defined(__SWITCH__)
+    return false;
+#else
     kinfo_proc info = {};
     int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
     size_t size = sizeof(info);
 
     return sysctl(mib, 4, &info, &size, nullptr, 0) == 0 && (info.kp_proc.p_flag & P_TRACED) != 0;
+#endif
 }
 
 }

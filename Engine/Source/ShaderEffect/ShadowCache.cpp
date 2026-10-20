@@ -218,9 +218,9 @@ int32_t CShadowCache::ValidateShadowMode(EShadowMode mode) {
                 case GxApi_D3d11:
                     return depthFormat;
 
-#if defined(WOWDECOMP_PLATFORM_MAC)
-                // The Mac client drew through its own GL renderer (GLL), which allowed these modes; on macOS the OpenGL
-                // device stands in for it.
+#if defined(WOWDECOMP_PLATFORM_POSIX)
+                // The Mac client drew through its own GL renderer (GLL), which allowed these modes; on macOS (and the
+                // Switch) the OpenGL device stands in for it.
                 case GxApi_OpenGl:
 #endif
                 case GxApi_GLL:

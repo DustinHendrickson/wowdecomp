@@ -109,7 +109,13 @@ int32_t AttributesFromStat(const struct stat& info, const std::string& path) {
         attributes |= kAttributeReadOnly;
     }
 
-    if (BaseName(path)[0] == '.' || (info.st_flags & UF_HIDDEN)) {
+#if defined(__APPLE__)
+    bool hidden = (info.st_flags & UF_HIDDEN) != 0;
+#else
+    bool hidden = false;
+#endif
+
+    if (BaseName(path)[0] == '.' || hidden) {
         attributes |= kAttributeHidden;
     }
 
@@ -124,9 +130,16 @@ int32_t AttributesFromStat(const struct stat& info, const std::string& path) {
 
 void FillInfo(Blizzard::File::FileInfo* info, const struct stat& data, const std::string& path) {
     info->m_size = data.st_size;
+#if defined(__APPLE__)
     info->m_createTime = FromTimespec(data.st_birthtimespec);
     info->m_modTime = FromTimespec(data.st_mtimespec);
     info->m_accessTime = FromTimespec(data.st_atimespec);
+#else
+    // No birth time: the change time stands in, as Linux tools use it.
+    info->m_createTime = FromTimespec(data.st_ctim);
+    info->m_modTime = FromTimespec(data.st_mtim);
+    info->m_accessTime = FromTimespec(data.st_atim);
+#endif
     info->m_attributes = AttributesFromStat(data, path);
     info->m_regularFile = (info->m_attributes & kAttributeNormal) != 0;
     info->m_existence = ((info->m_attributes & kAttributeDirectory) != 0) + 1;
@@ -163,7 +176,9 @@ int OpenNative(const std::string& path, int32_t mode) {
         return -1;
     }
 
-    // Keep descriptors off 0-2 so a handle never reads as nullptr (no stream) in shared code.
+    // Keep descriptors off 0-2 so a handle never reads as nullptr (no stream) in shared code. (The Switch's file
+    // descriptors for files start above the standard streams.)
+#if defined(__APPLE__)
     if (fd < 3) {
         int moved = fcntl(fd, F_DUPFD_CLOEXEC, 3);
         close(fd);
@@ -173,6 +188,7 @@ int OpenNative(const std::string& path, int32_t mode) {
     if (fd >= 0 && (mode & 0x40)) {
         fcntl(fd, F_NOCACHE, 1);
     }
+#endif
 
     return fd;
 }
@@ -762,7 +778,14 @@ bool System_File::SetCacheMode(Blizzard::File::Filesystem* fs, System_File::Stac
     Blizzard::File::StreamRecord* stream = parms->m_stream;
     stream->m_mode = parms->m_mode | (stream->m_mode & ~0x40);
 
-    if (!Valid(stream) || fcntl(Descriptor(stream), F_NOCACHE, (stream->m_mode & 0x40) ? 1 : 0) == -1) {
+#if defined(F_NOCACHE)
+    bool failed = !Valid(stream) || fcntl(Descriptor(stream), F_NOCACHE, (stream->m_mode & 0x40) ? 1 : 0) == -1;
+#else
+    // The SD card has no cache to bypass.
+    bool failed = !Valid(stream);
+#endif
+
+    if (failed) {
         Blizzard::File::SetLastError(4);
         Blizzard::File::AddToLastErrorStack(4, "POSIX SetCacheMode", 1);
         return false;
@@ -793,12 +816,19 @@ bool System_File::SetEOF(Blizzard::File::Filesystem* fs, System_File::Stacked::F
 bool System_File::SetAttributes(Blizzard::File::Filesystem* fs, System_File::Stacked::FileParms* parms) {
     if (parms->m_has.m_all & 0x10) {
         Blizzard::Time::Timestamp time = parms->m_info->m_modTime;
+#if defined(__SWITCH__)
+        // The SD card's FAT has modification times, but libnx can't set them; they stay at the time of the write.
+        bool failed = false;
+        (void)time;
+#else
         timespec times[2];
         times[0].tv_sec = 0;
         times[0].tv_nsec = UTIME_OMIT;
         times[1] = ToTimespec(time);
+        bool failed = futimens(Descriptor(parms->m_stream), times) != 0;
+#endif
 
-        if (futimens(Descriptor(parms->m_stream), times) != 0) {
+        if (failed) {
             Blizzard::File::SetLastError(8);
             return false;
         }

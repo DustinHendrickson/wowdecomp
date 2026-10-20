@@ -2,6 +2,8 @@ file(GLOB PRIVATE_SOURCES CONFIGURE_DEPENDS "*.cpp")
 
 if (WOWDECOMP_PLATFORM_MAC)
     file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Mac/*.cpp" "Mac/*.mm")
+elseif (WOWDECOMP_PLATFORM_SWITCH)
+    file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Mac/*.cpp" "Switch/*.cpp")
 elseif (WOWDECOMP_ARCH_64)
     file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Win64/*.cpp")
 else ()
@@ -12,6 +14,8 @@ add_executable(Wow WIN32 MACOSX_BUNDLE ${PRIVATE_SOURCES} ${PLATFORM_SOURCES})
 
 if (WOWDECOMP_PLATFORM_MAC)
     set(WOW_OUTPUT_NAME "World of Warcraft")
+elseif (WOWDECOMP_PLATFORM_SWITCH)
+    set(WOW_OUTPUT_NAME Wow)
 elseif (WOWDECOMP_ARCH_64)
     set(WOW_OUTPUT_NAME Wow64)
 else ()
@@ -66,6 +70,33 @@ if (WOWDECOMP_PLATFORM_MAC)
     )
 
     install(TARGETS Wow BUNDLE DESTINATION .)
+endif ()
+
+# On the Switch, Wow.elf is packaged as WoW.nro, the homebrew executable the Homebrew Menu starts. It goes into
+# sdmc:/switch/wow/ next to the game's Data folder (see docs/SWITCH_PORT.md).
+if (WOWDECOMP_PLATFORM_SWITCH)
+    # Wow.elf keeps the symbols: crash logs give addresses as offsets into it, for aarch64-none-elf-addr2line.
+    set_target_properties(Wow PROPERTIES SUFFIX .elf)
+
+    set(WOW_NACP ${CMAKE_CURRENT_BINARY_DIR}/Wow.nacp)
+    set(WOW_NRO ${WOWDECOMP_BIN_DIR}/WoW.nro)
+    set(WOW_ICON ${CMAKE_SOURCE_DIR}/Tools/Switch/icon.jpg)
+
+    add_custom_command(
+        OUTPUT ${WOW_NACP}
+        COMMAND ${NX_TOOLS}/nacptool --create "World of Warcraft" "wowdecomp" "3.3.5.12340" ${WOW_NACP}
+        VERBATIM
+    )
+
+    add_custom_command(
+        OUTPUT ${WOW_NRO}
+        COMMAND ${NX_TOOLS}/elf2nro $<TARGET_FILE:Wow> ${WOW_NRO} --nacp=${WOW_NACP} --icon=${WOW_ICON}
+        DEPENDS Wow ${WOW_NACP} ${WOW_ICON}
+        COMMENT "Packaging WoW.nro"
+        VERBATIM
+    )
+
+    add_custom_target(WowNro ALL DEPENDS ${WOW_NRO})
 endif ()
 
 target_link_libraries(Wow

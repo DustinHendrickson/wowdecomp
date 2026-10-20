@@ -179,7 +179,7 @@ elseif (WIN32)
             XvidDecoder
     )
 endif ()
-if (APPLE)
+if (APPLE OR NINTENDO_SWITCH)
     # xvidcore 1.3.7 from source, plain C for arm64 (see xvidcore/README.md): the MPEG-4 decoder behind the movies.
     set(XVIDCORE_SRC ${CMAKE_CURRENT_SOURCE_DIR}/xvidcore/src)
     set(XVIDCORE_SOURCES

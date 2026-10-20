@@ -3,6 +3,7 @@
 // client (its s_pnet stays null), so OsNetPump only waits, as it does on Windows.
 
 #include <arpa/inet.h>
+#include <sys/socket.h>
 #include <cstdint>
 #include <cstring>
 #include <netinet/in.h>

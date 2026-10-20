@@ -10,7 +10,9 @@
 #include <cstring>
 #include <fcntl.h>
 #include <string>
+#if defined(__APPLE__)
 #include <sys/mount.h>
+#endif
 #include <sys/stat.h>
 #include <unistd.h>
 #include "Engine/Source/Storm/Source/IOUnit/IOFileUnit.h"
@@ -76,18 +78,22 @@ void* OpenFileHandle(const Storm::IOFileParam* param) {
 
     int fd = open(NativePath(param->m_name).c_str(), flags | O_CLOEXEC, 0666);
 
+#if defined(__APPLE__)
     if (fd >= 0 && fd < 3) {
         int moved = fcntl(fd, F_DUPFD_CLOEXEC, 3);
         close(fd);
         fd = moved;
     }
+#endif
 
     if (fd < 0) {
         return nullptr;
     }
 
     if (param->m_flags & kFlagNoBuffering) {
+#if defined(F_NOCACHE)
         fcntl(fd, F_NOCACHE, 1);
+#endif
     }
 
     return reinterpret_cast<void*>(static_cast<intptr_t>(fd));
@@ -355,6 +361,7 @@ IOUnbufferedFileUnit::IOUnbufferedFileUnit(void* handle, const IOFileParam* para
     this->m_buffer = malloc(0x100000);
 
     // Transfers stay block aligned like Windows unbuffered I/O; the block size comes from the volume.
+#if defined(__APPLE__)
     struct statfs volume;
 
     if (statfs(NativePath(this->m_path).c_str(), &volume) != 0 || !volume.f_bsize || ((volume.f_bsize - 1) & volume.f_bsize)) {
@@ -362,6 +369,10 @@ IOUnbufferedFileUnit::IOUnbufferedFileUnit(void* handle, const IOFileParam* para
     } else {
         this->m_alignMask = volume.f_bsize - 1;
     }
+#else
+    // The Switch reports no volume block size.
+    this->m_alignMask = 0xFFFF;
+#endif
 }
 
 void* IOUnbufferedFileUnit::Win32Handle() {

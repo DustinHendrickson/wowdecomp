@@ -2,49 +2,68 @@
 #
 # Windows is the reference platform: its sources live in Win32/ and Win64/ folders (guarded inside by
 # WOWDECOMP_ARCH_32 / WOWDECOMP_ARCH_64). The macOS port puts its implementations in Mac/ folders next to them.
+#
+# The Nintendo Switch port (cmake/SwitchToolchain.cmake) builds on the macOS port: most Mac/ code is plain POSIX and is
+# shared. WOWDECOMP_PLATFORM_POSIX covers both. A Switch/ folder next to a Mac/ folder holds the Switch versions; a
+# file there replaces the Mac/ file of the same name, and Objective-C++ (.mm) is macOS only.
 
 if (WIN32)
     set(WOWDECOMP_PLATFORM_WIN 1)
+elseif (NINTENDO_SWITCH)
+    set(WOWDECOMP_PLATFORM_SWITCH 1)
+    set(WOWDECOMP_PLATFORM_POSIX 1)
 elseif (APPLE)
     set(WOWDECOMP_PLATFORM_MAC 1)
+    set(WOWDECOMP_PLATFORM_POSIX 1)
     # AppKit glue (windows, events, dialogs, clipboard) is Objective-C++ in .mm files.
     enable_language(OBJCXX)
     set(CMAKE_OBJCXX_STANDARD 17)
     set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
 else ()
-    message(FATAL_ERROR "wowdecomp targets Windows and macOS only.")
+    message(FATAL_ERROR "wowdecomp targets Windows, macOS and the Nintendo Switch only.")
 endif ()
 
-# Adjusts a module's source list for the current platform: off Windows, drops the Win32/ and Win64/ folders and
-# adds every .cpp and .mm under Mac/ folders. Call it right after the module's file(GLOB...) of *.cpp.
+# Adjusts a module's source list for the current platform: off Windows, drops the Win32/ and Win64/ folders and keeps
+# Mac/ ones, adding their .mm files on macOS; on the Switch, keeps Switch/ folders too, where a file replaces the Mac/
+# file of the same name in the same parent folder. Call it right after the module's file(GLOB_RECURSE...) of *.cpp.
 function (wowdecomp_platform_sources var)
     # Match folder names relative to the module, so a checkout path that happens to contain them doesn't drop sources.
     set(sources "")
+    set(switch_sources "")
     foreach (source ${${var}})
         file(RELATIVE_PATH relative ${CMAKE_CURRENT_SOURCE_DIR} ${source})
         set(relative "/${relative}")
-        if (WOWDECOMP_PLATFORM_WIN AND relative MATCHES "/Mac/")
+        if (WOWDECOMP_PLATFORM_WIN AND relative MATCHES "/(Mac|Switch)/")
             continue ()
         endif ()
         if (NOT WOWDECOMP_PLATFORM_WIN AND relative MATCHES "/[Ww]in(32|64)/")
             continue ()
         endif ()
+        if (relative MATCHES "/Switch/")
+            if (NOT WOWDECOMP_PLATFORM_SWITCH)
+                continue ()
+            endif ()
+            list(APPEND switch_sources ${source})
+        endif ()
         list(APPEND sources ${source})
     endforeach ()
-    if (NOT WOWDECOMP_PLATFORM_WIN)
-        file(GLOB_RECURSE mac_sources CONFIGURE_DEPENDS
-            "${CMAKE_CURRENT_SOURCE_DIR}/*/Mac/*.cpp"
-            "${CMAKE_CURRENT_SOURCE_DIR}/*/Mac/*.mm"
-            "${CMAKE_CURRENT_SOURCE_DIR}/Mac/*.cpp"
-            "${CMAKE_CURRENT_SOURCE_DIR}/Mac/*.mm"
-        )
-        list(APPEND sources ${mac_sources})
-        list(REMOVE_DUPLICATES sources)
+    foreach (source ${switch_sources})
+        string(REGEX REPLACE "/Switch/([^/]+)$" "/Mac/\\1" replaced ${source})
+        list(REMOVE_ITEM sources ${replaced})
+    endforeach ()
+    if (WOWDECOMP_PLATFORM_MAC)
+        file(GLOB_RECURSE mm_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.mm")
+        foreach (source ${mm_sources})
+            file(RELATIVE_PATH relative ${CMAKE_CURRENT_SOURCE_DIR} ${source})
+            if ("/${relative}" MATCHES "/Mac/")
+                list(APPEND sources ${source})
+            endif ()
+        endforeach ()
     endif ()
     set(${var} ${sources} PARENT_SCOPE)
 endfunction ()
 
-# Flags for the project's own code (not ThirdParty) on macOS. Call it after add_subdirectory(ThirdParty).
+# Flags for the project's own code (not ThirdParty) on macOS and the Switch. Call it after add_subdirectory(ThirdParty).
 macro (wowdecomp_mac_compile_options)
     add_compile_options(
         # Decompiled code type-puns and relies on MSVC-style layouts and extensions.
@@ -67,10 +86,16 @@ macro (wowdecomp_mac_compile_options)
         $<$<COMPILE_LANGUAGE:CXX>:-Wno-register>
         $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>
     )
-    # Stand-ins for MSVC CRT headers that macOS lacks (<malloc.h>).
-    include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/Engine/Source/Base/Compat/Mac)
+    # Stand-ins for MSVC CRT headers that macOS lacks (<malloc.h>). newlib has its own.
+    if (WOWDECOMP_PLATFORM_MAC)
+        include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/Engine/Source/Base/Compat/Mac)
+    endif ()
+    # Darwin headers the shared Mac/ layers include (<crt_externs.h>, <dlfcn.h>), for the Switch.
+    if (WOWDECOMP_PLATFORM_SWITCH)
+        include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/Engine/Source/Base/Compat/Switch)
+    endif ()
     # arm64: <xmmintrin.h> / <emmintrin.h> resolve to sse2neon wrappers.
-    if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
+    if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64" OR WOWDECOMP_PLATFORM_SWITCH)
         include_directories(BEFORE SYSTEM
             ${CMAKE_SOURCE_DIR}/Engine/Source/Base/Compat/MacArm64
             ${CMAKE_SOURCE_DIR}/ThirdParty/sse2neon
@@ -81,6 +106,8 @@ endmacro ()
 # Where the client executables go.
 if (WOWDECOMP_PLATFORM_WIN)
     set(WOWDECOMP_BIN_DIR ${CMAKE_SOURCE_DIR}/bin/Win)
+elseif (WOWDECOMP_PLATFORM_SWITCH)
+    set(WOWDECOMP_BIN_DIR ${CMAKE_SOURCE_DIR}/bin/Switch)
 else ()
     set(WOWDECOMP_BIN_DIR ${CMAKE_SOURCE_DIR}/bin/Mac)
 endif ()

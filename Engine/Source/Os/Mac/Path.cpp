@@ -1,11 +1,14 @@
-// macOS implementation of Os/Win64/Path.cpp. Paths and the command line are UTF-8 already.
+// macOS implementation of Os/Win64/Path.cpp. Paths and the command line are UTF-8 already. The Switch build shares
+// it: there the executable is the NRO the Homebrew Menu passes as argv[0] (sdmc:/switch/wow/WoW.nro).
 
 #include <climits>
 #include <crt_externs.h>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#if defined(__APPLE__)
 #include <mach-o/dyld.h>
+#endif
 #include <string>
 #include "Engine/Source/BlizzardCore/Source/System/Process/Mac/GameDirectory.h"
 #include "Engine/Source/Os/Path.h"
@@ -22,6 +25,13 @@ uint32_t GetModuleFileNameUTF8(void* module, char* path, uint32_t size) {
         return 0;
     }
 
+#if defined(__SWITCH__)
+    (void)length;
+    const char* argv0 = *_NSGetArgc() > 0 && (*_NSGetArgv())[0] && (*_NSGetArgv())[0][0] ? (*_NSGetArgv())[0] : "sdmc:/switch/wow/WoW.nro";
+    strncpy(executable, argv0, sizeof(executable) - 1);
+    executable[sizeof(executable) - 1] = '\0';
+    char* source = executable;
+#else
     if (_NSGetExecutablePath(executable, &length) != 0) {
         path[0] = '\0';
         return 0;
@@ -29,6 +39,7 @@ uint32_t GetModuleFileNameUTF8(void* module, char* path, uint32_t size) {
 
     char resolved[PATH_MAX];
     char* source = realpath(executable, resolved) ? resolved : executable;
+#endif
 
     // In a bundle the application file is Wow.app, not Wow.app/Contents/MacOS/Wow: callers strip the filename to find
     // the game folder (OsGetExePath), which holds Data/ next to the bundle, as Blizzard::Process::GetProcessDirectory
