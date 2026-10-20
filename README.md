@@ -44,7 +44,7 @@ parts of FMOD Ex).
   executables; the x64 build uses its own decoder instead)
 - A World of Warcraft **3.3.5a (12340)** client. No game data is included in this repository.
 
-On macOS (Apple Silicon, work in progress, see [docs/MACOS_PORT.md](docs/MACOS_PORT.md)):
+On macOS (Apple Silicon; port notes in [docs/MACOS_PORT.md](docs/MACOS_PORT.md)):
 
 - macOS 13 or newer on an M-series Mac
 - Xcode Command Line Tools (`xcode-select --install`)
@@ -84,6 +84,8 @@ logger off in `WowClient` with `-DWOWCLIENT_CRASH_LOG=OFF`.
 
 ### macOS
 
+Clone the repository as above, then from its folder:
+
 ```bash
 cmake -S . -B build/mac -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build/mac --target Wow WowClient
@@ -107,20 +109,29 @@ and `SoundTest` build into `bin/Mac/` too.
 2. Point `Data/<locale>/realmlist.wtf` at the server you want to connect to.
 3. Start `bin/Win/WowClient64.exe` (or `Wow64.exe`).
 
-On macOS, install the app into your 3.3.5a folder, next to `Data` and `Wow.exe`, the way Blizzard's Mac client sat in
-its game folder:
+On macOS:
 
-```bash
-cmake --install build/mac --prefix "/path/to/your/3.3.5a folder"
-```
+1. Build as above.
+2. Install the app into your 3.3.5a folder, next to its `Data` folder (where `Wow.exe` is), the way Blizzard's Mac
+   client sat in its game folder:
 
-Then open **World of Warcraft** in that folder (drag it to the Dock to keep it there). Settings, logs and AddOns live in
-that folder, as with `Wow.exe`. For development, `bin/Mac/World of Warcraft.app` and `bin/Mac/WowClient` also run with
-`Data` linked into `bin/Mac/`. Started anywhere without `Data` next to it, the app asks for the game folder once and
-remembers it (hold Option at launch to choose another). On Retina displays the game renders at full resolution; to render at one pixel per point instead
-(faster, softer), run `defaults write org.wowdecomp.wow Retina -bool NO` (or `WowClient` in place of the bundle id for
-the plain executable), or set `WOWDECOMP_RETINA=0`. The client reports itself to the server as Windows x86, as the original does. Warden's modules
-are x86 code and can't run on Apple Silicon, so connect to a server with Warden turned off.
+   ```bash
+   cmake --install build/mac --prefix "/path/to/your/3.3.5a folder"
+   ```
+
+3. Point `Data/<locale>/realmlist.wtf` at the server you want to connect to.
+4. Open **World of Warcraft** in that folder. Drag it to the Dock to keep it there.
+
+Settings, logs, screenshots and AddOns live in that folder, as with `Wow.exe`. Notes:
+
+- Started somewhere without `Data` next to it, the app asks for your 3.3.5a folder once and remembers it. Hold Option
+  while launching to choose another.
+- On Retina displays the game renders at full resolution. To render at one pixel per point instead (faster, softer):
+  `defaults write org.wowdecomp.wow Retina -bool NO`, or `WOWDECOMP_RETINA=0` for `WowClient`.
+- The client reports itself to the server as Windows x86, as the original does. Warden's modules are x86 code and
+  aren't run (as in the Windows x64 build), so use a server with Warden turned off.
+- For development, `bin/Mac/World of Warcraft.app` and `bin/Mac/WowClient` run in place with `Data` linked into
+  `bin/Mac/`; `WowClient` prints its log to the terminal.
 
 ## Layout
 
