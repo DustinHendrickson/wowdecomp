@@ -91,9 +91,10 @@ cmake -S . -B build/mac -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build/mac --target Wow WowClient
 ```
 
-This writes `bin/Mac/World of Warcraft.app` (the app bundle) and `bin/Mac/WowClient` (the same client as a plain
-executable, handy from a terminal since its output goes there). The Mac-only self-tests `OsWindowTest`, `GxDrawTest`, `NetTest`
-and `SoundTest` build into `bin/Mac/` too.
+This writes `bin/Mac/WowClient` (the client as a plain executable, handy from a terminal since its output goes there)
+and `World of Warcraft.app` (the app bundle) into `bin/Mac/Apps.noindex/`, a folder Spotlight skips, so only the copy
+you install shows up in Spotlight and Launchpad. The Mac-only self-tests `NetTest` and `SoundTest` build into `bin/Mac/`,
+and `OsWindowTest.app` and `GxDrawTest.app` into `bin/Mac/Apps.noindex/`.
 
 ### Options
 
@@ -130,8 +131,8 @@ Settings, logs, screenshots and AddOns live in that folder, as with `Wow.exe`. N
   `defaults write org.wowdecomp.wow Retina -bool NO`, or `WOWDECOMP_RETINA=0` for `WowClient`.
 - The client reports itself to the server as Windows x86, as the original does. Warden's modules are x86 code and
   aren't run (as in the Windows x64 build), so use a server with Warden turned off.
-- For development, `bin/Mac/World of Warcraft.app` and `bin/Mac/WowClient` run in place with `Data` linked into
-  `bin/Mac/`; `WowClient` prints its log to the terminal.
+- For development, `bin/Mac/WowClient` runs in place with `Data` linked into `bin/Mac/` and prints its log to the
+  terminal.
 
 ## Layout
 

@@ -85,6 +85,10 @@ else ()
     set(WOWDECOMP_BIN_DIR ${CMAKE_SOURCE_DIR}/bin/Mac)
 endif ()
 
+# Where the macOS app bundles are built. Spotlight skips folders ending in .noindex (as Xcode's build folders do), so
+# the build's copy of World of Warcraft.app doesn't show up next to the installed one; cmake --install copies it out.
+set(WOWDECOMP_MAC_APP_DIR ${WOWDECOMP_BIN_DIR}/Apps.noindex)
+
 # System libraries the client executables link on macOS.
 set(WOWDECOMP_MAC_FRAMEWORKS
     "-framework Cocoa"

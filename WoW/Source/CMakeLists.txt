@@ -37,10 +37,17 @@ if (WOWDECOMP_PLATFORM_WIN)
     target_link_options(Wow PRIVATE "/INCREMENTAL:NO" "/ENTRY:start")
 endif ()
 
-# On macOS Wow is "bin/Mac/World of Warcraft.app", as Blizzard's Mac client was named. Like Wow.exe it belongs in the
-# game folder, next to Data/: cmake --install <build> --prefix <3.3.5a folder> puts it there. The game folder is the one
-# holding the bundle (or one chosen at launch when that has no Data; see WoW/Source/Mac/main.mm).
+# On macOS Wow is "World of Warcraft.app", as Blizzard's Mac client was named, built into bin/Mac/Apps.noindex (out of
+# Spotlight). Like Wow.exe it belongs in the game folder, next to Data/: cmake --install <build> --prefix <3.3.5a
+# folder> puts it there, or into /Applications, where it runs from a game folder chosen at launch (WoW/Source/Mac/main.mm).
 if (WOWDECOMP_PLATFORM_MAC)
+    set_target_properties(Wow PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${WOWDECOMP_MAC_APP_DIR})
+
+    foreach (config ${CMAKE_CONFIGURATION_TYPES} ${CMAKE_BUILD_TYPE})
+        string(TOUPPER ${config} config)
+        set_target_properties(Wow PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${config} ${WOWDECOMP_MAC_APP_DIR})
+    endforeach ()
+
     wowdecomp_mac_bundle_icon(Wow Wow)
 
     set_target_properties(Wow PROPERTIES

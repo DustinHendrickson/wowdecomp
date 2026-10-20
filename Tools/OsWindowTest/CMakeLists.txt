@@ -2,7 +2,7 @@
 add_executable(OsWindowTest MACOSX_BUNDLE main.mm)
 
 set_target_properties(OsWindowTest PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${WOWDECOMP_BIN_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${WOWDECOMP_MAC_APP_DIR}
     MACOSX_BUNDLE_GUI_IDENTIFIER org.wowdecomp.oswindowtest
     MACOSX_BUNDLE_BUNDLE_NAME OsWindowTest
 )
