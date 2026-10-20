@@ -13,6 +13,11 @@ uint32_t SwitchClipboardGeneration();
 
 void SwitchShowMessage(const char* title, const char* message);
 
+// Development settings from Debug.txt in the game folder, one "name=value" per line; nullptr when unset. The Switch has
+// no environment for the WOWDECOMP_* variables the macOS build reads. Known names:
+//   screenshots=15,25   press Print Screen that many seconds after the first input poll (WOWDECOMP_SCREENSHOTS)
+const char* SwitchDebugSetting(const char* name);
+
 // 0 Control, 1 Shift, 2 Alt, as OsGuiIsModifierKeyDown takes them.
 int32_t SwitchIsModifierDown(int32_t modifier);
 

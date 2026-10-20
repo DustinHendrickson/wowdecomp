@@ -63,6 +63,10 @@ nxlink -s bin/Switch/WoW.nro
 (the Homebrew Menu must be open with its nxlink server running: press Y in it). The NRO's folder is then `sdmc:/switch/`,
 so put `Data` there or pass the NRO's final path with `-p switch/wow/WoW.nro`.
 
+Without nxlink, stdout and stderr go to `Logs/Console.txt` in the game folder. Development settings go in `Debug.txt`
+there, one `name=value` per line (the Switch has no environment variables): `screenshots=15,25` presses Print Screen
+15 and 25 seconds after start, like `WOWDECOMP_SCREENSHOTS` on macOS.
+
 ### NSP forwarder
 
 The NRO is what homebrew runs as today. A home-screen icon that starts it is an NSP *forwarder*, built on your own

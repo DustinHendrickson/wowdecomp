@@ -43,6 +43,7 @@ int main() {
 
     MacSetGameDirectory(folder);
     chdir(folder);
+    NxMainRedirectConsole();
 
     pthread_attr_t attributes;
     pthread_attr_init(&attributes);

@@ -5,6 +5,8 @@
 #include <cstring>
 #include <dirent.h>
 #include <strings.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "WoW/Source/Switch/NxMain.h"
 
 extern "C" int __system_argc;
@@ -43,6 +45,29 @@ bool NxMainInitialize() {
     s_nxlink = nxlinkStdio();
 
     return true;
+}
+
+void NxMainRedirectConsole() {
+    if (s_nxlink >= 0) {
+        return;
+    }
+
+    mkdir("Logs", 0777);
+
+    // Two streams on one file, both appending, so neither overwrites the other's lines.
+    FILE* file = fopen("Logs/Console.txt", "w");
+
+    if (file) {
+        fclose(file);
+    }
+
+    if (freopen("Logs/Console.txt", "a", stdout)) {
+        setvbuf(stdout, nullptr, _IOLBF, 0);
+    }
+
+    if (freopen("Logs/Console.txt", "a", stderr)) {
+        setvbuf(stderr, nullptr, _IONBF, 0);
+    }
 }
 
 void NxMainShutdown() {

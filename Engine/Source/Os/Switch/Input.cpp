@@ -39,6 +39,9 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <map>
+#include <vector>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -85,6 +88,37 @@ uint64_t s_lastPollMs;
 // Controller state.
 bool s_cursorMode;
 NxInputState s_previous;
+
+// Debugging aid, as WOWDECOMP_SCREENSHOTS on macOS: "screenshots=20,45" in Debug.txt presses Print Screen that many seconds
+// after the first input poll, so a run can be checked from the game's own screenshots with nobody at the controller.
+void PutScheduledScreenshots(uint64_t now) {
+    static std::vector<double> s_times;
+    static bool s_parsed;
+    static uint64_t s_start;
+
+    if (!s_parsed) {
+        s_parsed = true;
+        s_start = now;
+
+        for (const char* times = SwitchDebugSetting("screenshots"); times && *times;) {
+            char* end;
+            double seconds = strtod(times, &end);
+
+            if (end == times) {
+                break;
+            }
+
+            s_times.push_back(seconds);
+            times = *end == ',' ? end + 1 : end;
+        }
+    }
+
+    if (!s_times.empty() && static_cast<double>(now - s_start) / 1000.0 >= s_times.front()) {
+        s_times.erase(s_times.begin());
+        OsQueuePut(OS_INPUT_KEY_DOWN, KEY_PRINTSCREEN, 1, 0, 0);
+        OsQueuePut(OS_INPUT_KEY_UP, KEY_PRINTSCREEN, 1, 0, 0);
+    }
+}
 
 // What each controller button did when it went down, undone when it comes up whatever the mode is by then.
 enum OutputType {
@@ -880,6 +914,7 @@ void Poll() {
     }
 
     PollKeyboardRequest();
+    PutScheduledScreenshots(now);
 
     NxInputState state;
     NxInputPoll(&state);
@@ -1191,6 +1226,37 @@ void SwitchSetTextFocus(bool focus) {
     } else if (!focus) {
         s_textFocus = false;
     }
+}
+
+const char* SwitchDebugSetting(const char* name) {
+    static std::map<std::string, std::string>* s_settings;
+
+    if (!s_settings) {
+        s_settings = new std::map<std::string, std::string>();
+
+        if (FILE* file = fopen("Debug.txt", "r")) {
+            char line[1024];
+
+            while (fgets(line, sizeof(line), file)) {
+                std::string text = line;
+
+                while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' ')) {
+                    text.pop_back();
+                }
+
+                size_t equals = text.find('=');
+
+                if (equals != std::string::npos && text[0] != '#') {
+                    (*s_settings)[text.substr(0, equals)] = text.substr(equals + 1);
+                }
+            }
+
+            fclose(file);
+        }
+    }
+
+    auto it = s_settings->find(name);
+    return it == s_settings->end() ? nullptr : it->second.c_str();
 }
 
 void SwitchShowMessage(const char* title, const char* message) {
