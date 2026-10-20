@@ -1,9 +1,11 @@
 // WGL stand-ins for the shared OpenGL device code on macOS (see GlMac.h).
 
 #import <AppKit/AppKit.h>
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <set>
 #include <vector>
 #include <dlfcn.h>
 #include <pthread.h>
@@ -97,7 +99,97 @@ void DebugProgramString(GLenum target, GLenum format, GLsizei length, const void
     fprintf(stderr, "GL %s program rejected at %d: %s\n    %.*s\n", target == GL_VERTEX_PROGRAM_ARB ? "vertex" : "fragment", position, glGetString(GL_PROGRAM_ERROR_STRING_ARB), static_cast<int>(end - line), line);
 }
 
+PFNGLCOMPRESSEDTEXIMAGE2DARBPROC s_realCompressedTexImage2D;
+PFNGLCOMPRESSEDTEXSUBIMAGE2DARBPROC s_realCompressedTexSubImage2D;
+
+void DebugCompressedTexImage2D(GLenum target, GLint level, GLenum format, GLsizei width, GLsizei height, GLint border, GLsizei size, const void* data) {
+    s_realCompressedTexImage2D(target, level, format, width, height, border, size, data);
+    GLenum error = glGetError();
+
+    if (error != GL_NO_ERROR) {
+        fprintf(stderr, "GL error 0x%x from glCompressedTexImage2D (level %d, %dx%d, format 0x%x, size %d, data %p)\n", error, level, width, height, format, size, data);
+    }
+}
+
+void DebugCompressedTexSubImage2D(GLenum target, GLint level, GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLsizei size, const void* data) {
+    s_realCompressedTexSubImage2D(target, level, x, y, width, height, format, size, data);
+    GLenum error = glGetError();
+
+    if (error != GL_NO_ERROR) {
+        fprintf(stderr, "GL error 0x%x from glCompressedTexSubImage2D (level %d, %d,%d %dx%d, format 0x%x, size %d)\n", error, level, x, y, width, height, format, size);
+    }
+}
+
+// An incomplete texture (a mipmapped filter with levels missing or the wrong size) samples as if texturing were off:
+// untextured geometry, white in the UI. Each texture bound for a draw is checked once.
+void CheckBoundTexturesComplete() {
+    static std::set<GLuint> s_checked;
+    static int s_reports;
+
+    if (s_reports >= 40) {
+        return;
+    }
+
+    GLint active = GL_TEXTURE0;
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &active);
+
+    for (GLenum unit = 0; unit < 4; unit++) {
+        glActiveTexture(GL_TEXTURE0 + unit);
+
+        GLint name = 0;
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &name);
+
+        if (!name || !s_checked.insert(static_cast<GLuint>(name)).second) {
+            continue;
+        }
+
+        GLint minFilter = 0;
+        GLint maxLevel = 0;
+        GLint width = 0;
+        GLint height = 0;
+        glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, &minFilter);
+        glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, &maxLevel);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
+
+        char problem[256] = "";
+
+        if (!width || !height) {
+            snprintf(problem, sizeof(problem), "level 0 undefined");
+        } else if (minFilter != GL_NEAREST && minFilter != GL_LINEAR) {
+            for (GLint level = 1; level <= maxLevel; level++) {
+                GLint expectedWidth = std::max(width >> level, 1);
+                GLint expectedHeight = std::max(height >> level, 1);
+                GLint levelWidth = 0;
+                GLint levelHeight = 0;
+                glGetTexLevelParameteriv(GL_TEXTURE_2D, level, GL_TEXTURE_WIDTH, &levelWidth);
+                glGetTexLevelParameteriv(GL_TEXTURE_2D, level, GL_TEXTURE_HEIGHT, &levelHeight);
+
+                if (levelWidth != expectedWidth || levelHeight != expectedHeight) {
+                    snprintf(problem, sizeof(problem), "level %d is %dx%d, expected %dx%d (max level %d)", level, levelWidth, levelHeight, expectedWidth, expectedHeight, maxLevel);
+                    break;
+                }
+
+                if (expectedWidth == 1 && expectedHeight == 1) {
+                    break;
+                }
+            }
+        }
+
+        if (problem[0]) {
+            s_reports++;
+            GLint format = 0;
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
+            fprintf(stderr, "GL incomplete texture %d on unit %u: %dx%d format 0x%x min filter 0x%x: %s\n", name, unit, width, height, format, minFilter, problem);
+        }
+    }
+
+    glActiveTexture(active);
+}
+
 void DebugDrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void* indices) {
+    CheckBoundTexturesComplete();
+
     static int s_reports;
 
     GLenum pending = glGetError();
@@ -183,6 +275,8 @@ void* wglGetProcAddress(const char* name) {
             { "glBufferSubDataARB", reinterpret_cast<void**>(&s_realBufferSubData), reinterpret_cast<void*>(DebugBufferSubData) },
             { "glMapBufferARB", reinterpret_cast<void**>(&s_realMapBuffer), reinterpret_cast<void*>(DebugMapBuffer) },
             { "glDeleteBuffersARB", reinterpret_cast<void**>(&s_realDeleteBuffers), reinterpret_cast<void*>(DebugDeleteBuffers) },
+            { "glCompressedTexImage2DARB", reinterpret_cast<void**>(&s_realCompressedTexImage2D), reinterpret_cast<void*>(DebugCompressedTexImage2D) },
+            { "glCompressedTexSubImage2DARB", reinterpret_cast<void**>(&s_realCompressedTexSubImage2D), reinterpret_cast<void*>(DebugCompressedTexSubImage2D) },
         };
 
         for (auto& wrapper : wrappers) {
