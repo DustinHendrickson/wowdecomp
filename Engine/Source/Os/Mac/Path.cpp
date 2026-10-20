@@ -7,6 +7,7 @@
 #include <cstring>
 #include <mach-o/dyld.h>
 #include <string>
+#include "Engine/Source/BlizzardCore/Source/System/Process/Mac/GameDirectory.h"
 #include "Engine/Source/Os/Path.h"
 #include "Engine/Source/Storm/H/storm.h"
 
@@ -34,6 +35,15 @@ uint32_t GetModuleFileNameUTF8(void* module, char* path, uint32_t size) {
     // does.
     if (char* bundle = strstr(source, ".app/Contents/MacOS/")) {
         bundle[4] = '\0';
+    }
+
+    // A game folder chosen at launch: the executable is reported inside it, so the folder callers derive is that one.
+    std::string chosen;
+
+    if (const char* game = MacGetGameDirectory()) {
+        const char* name = strrchr(source, '/');
+        chosen = std::string(game) + (name ? name + 1 : source);
+        source = &chosen[0];
     }
 
     uint32_t written = static_cast<uint32_t>(strlen(source));

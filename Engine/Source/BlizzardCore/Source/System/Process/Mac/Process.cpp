@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <vector>
 #include "Engine/Source/BlizzardCore/Source/System/Memory/TempBuffer.h"
+#include "Engine/Source/BlizzardCore/Source/System/Process/Mac/GameDirectory.h"
 #include "Engine/Source/BlizzardCore/Source/System/Process/Process.h"
 #include "Engine/Source/BlizzardCore/Source/System/String/Path.h"
 #include "Engine/Source/BlizzardCore/Source/System/String/String.h"
@@ -64,7 +65,29 @@ bool Blizzard::Process::GetProcessPath(char* buffer, int32_t buffersize) {
     return true;
 }
 
+namespace {
+
+std::string s_gameDirectory;
+
+}
+
+void MacSetGameDirectory(const char* directory) {
+    s_gameDirectory = directory ? directory : "";
+}
+
+const char* MacGetGameDirectory() {
+    return s_gameDirectory.empty() ? nullptr : s_gameDirectory.c_str();
+}
+
 bool Blizzard::Process::GetProcessDirectory(char* buffer, int32_t buffersize) {
+    if (const char* game = MacGetGameDirectory()) {
+        if (buffer && buffersize > 0) {
+            Blizzard::String::Copy(buffer, game, buffersize);
+        }
+
+        return true;
+    }
+
     Blizzard::Memory::TempBuffer<char, 1024> path(buffersize);
 
     if (!GetProcessPath(path.m_data, buffersize)) {

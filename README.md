@@ -107,8 +107,10 @@ and `SoundTest` build into `bin/Mac/` too.
 2. Point `Data/<locale>/realmlist.wtf` at the server you want to connect to.
 3. Start `bin/Win/WowClient64.exe` (or `Wow64.exe`).
 
-On macOS, put (or symlink) the `Data` folder in `bin/Mac/`, next to `Wow.app`, and start `bin/Mac/Wow.app` or
-`bin/Mac/WowClient`. On Retina displays the game renders at full resolution; to render at one pixel per point instead
+On macOS, either put (or symlink) the `Data` folder in `bin/Mac/`, next to `Wow.app`, and start `bin/Mac/Wow.app` or
+`bin/Mac/WowClient`; or start `Wow.app` from anywhere and choose your 3.3.5a folder when asked. The app then runs from
+that folder (settings, logs and AddOns live there, as next to `Wow.exe`) and remembers it; hold Option while launching to
+choose another. On Retina displays the game renders at full resolution; to render at one pixel per point instead
 (faster, softer), run `defaults write org.wowdecomp.wow Retina -bool NO` (or `WowClient` in place of the bundle id for
 the plain executable), or set `WOWDECOMP_RETINA=0`. The client reports itself to the server as Windows x86, as the original does. Warden's modules
 are x86 code and can't run on Apple Silicon, so connect to a server with Warden turned off.

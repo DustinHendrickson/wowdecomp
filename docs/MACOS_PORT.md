@@ -345,7 +345,13 @@ layer. Apple may drop OpenGL at some point.
   exceptions) is caught too. Checked with a harness: segfaults and overflows on the main thread and on a Storm thread,
   and `abort()`, all write `Errors/<date> Crash.txt` with a stack trace. The one earlier in-world crash with no log
   predates the GL context fix and hasn't recurred.
-- Open: Warden on servers that enforce it (its modules are x86 code).
+- Game folder: the one holding the app when it has `Data/` with MPQs; otherwise a 3.3.5a folder chosen at launch and
+  remembered in the `GameFolder` user default (Option at launch asks again). `MacSetGameDirectory` makes
+  `GetProcessDirectory` and `GetModuleFileNameUTF8` report it, so `SetPaths`, the MPQ base path, crash logs and bug
+  reports follow it.
+- The process holds an activity assertion so App Nap doesn't throttle it while its window is covered or hidden.
+- Warden: the Win64 `WardenClient.cpp` the Mac build uses drops `SMSG_WARDEN_DATA` without running modules, as the
+  Windows x64 build does, so a server that enforces Warden times the client out; nothing crashes.
 
 ## Rules of the road
 
