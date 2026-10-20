@@ -294,9 +294,10 @@ layer. Apple may drop OpenGL at some point.
   downloader launched through `Blizzard::Process`. `WardenClient.cpp` builds as is. Warden's modules are x86 and
   can't run, so the client needs a server with Warden off. OS and CPU stay `Win` / `x86` in the login packets.
 - `WoW/Source/Mac/main.mm`: ignores SIGPIPE, changes to the game folder, and calls `CommonMain`.
-- `Wow` is `bin/Mac/Wow.app`: an Info.plist, an icon built from `waystone.ico` with `sips` / `iconutil`, and an ad-hoc
+- `Wow` is `bin/Mac/World of Warcraft.app` (named as Blizzard's Mac client was; `cmake --install <build> --prefix <game
+  folder>` puts it next to `Data`): an Info.plist, an icon built from `waystone.ico` with `sips` / `iconutil`, and an ad-hoc
   signature over the bundle. `WowClient` stays a plain executable for terminal use. In a bundle the game folder is
-  the one holding `Wow.app` (`GetModuleFileNameUTF8` / `GetProcessDirectory` stop at `.app`), so `Data/` and `WTF/`
+  the one holding the app (`GetModuleFileNameUTF8` / `GetProcessDirectory` stop at `.app`), so `Data/` and `WTF/`
   sit next to it.
 - Linkage gotcha: Clang with `-fms-extensions` keeps external linkage for a `static` declared after an `extern` of the
   same name, where MSVC makes it internal. MinimapFrame's `s_mapId` collided with Map's, so it was renamed

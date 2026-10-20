@@ -89,8 +89,8 @@ cmake -S . -B build/mac -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build/mac --target Wow WowClient
 ```
 
-This writes `bin/Mac/Wow.app` (the app bundle) and `bin/Mac/WowClient` (the same client as a plain executable,
-handy from a terminal since its output goes there). The Mac-only self-tests `OsWindowTest`, `GxDrawTest`, `NetTest`
+This writes `bin/Mac/World of Warcraft.app` (the app bundle) and `bin/Mac/WowClient` (the same client as a plain
+executable, handy from a terminal since its output goes there). The Mac-only self-tests `OsWindowTest`, `GxDrawTest`, `NetTest`
 and `SoundTest` build into `bin/Mac/` too.
 
 ### Options
@@ -107,10 +107,17 @@ and `SoundTest` build into `bin/Mac/` too.
 2. Point `Data/<locale>/realmlist.wtf` at the server you want to connect to.
 3. Start `bin/Win/WowClient64.exe` (or `Wow64.exe`).
 
-On macOS, either put (or symlink) the `Data` folder in `bin/Mac/`, next to `Wow.app`, and start `bin/Mac/Wow.app` or
-`bin/Mac/WowClient`; or start `Wow.app` from anywhere and choose your 3.3.5a folder when asked. The app then runs from
-that folder (settings, logs and AddOns live there, as next to `Wow.exe`) and remembers it; hold Option while launching to
-choose another. On Retina displays the game renders at full resolution; to render at one pixel per point instead
+On macOS, install the app into your 3.3.5a folder, next to `Data` and `Wow.exe`, the way Blizzard's Mac client sat in
+its game folder:
+
+```bash
+cmake --install build/mac --prefix "/path/to/your/3.3.5a folder"
+```
+
+Then open **World of Warcraft** in that folder (drag it to the Dock to keep it there). Settings, logs and AddOns live in
+that folder, as with `Wow.exe`. For development, `bin/Mac/World of Warcraft.app` and `bin/Mac/WowClient` also run with
+`Data` linked into `bin/Mac/`. Started anywhere without `Data` next to it, the app asks for the game folder once and
+remembers it (hold Option at launch to choose another). On Retina displays the game renders at full resolution; to render at one pixel per point instead
 (faster, softer), run `defaults write org.wowdecomp.wow Retina -bool NO` (or `WowClient` in place of the bundle id for
 the plain executable), or set `WOWDECOMP_RETINA=0`. The client reports itself to the server as Windows x86, as the original does. Warden's modules
 are x86 code and can't run on Apple Silicon, so connect to a server with Warden turned off.

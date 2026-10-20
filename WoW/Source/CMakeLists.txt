@@ -11,7 +11,7 @@ endif ()
 add_executable(Wow WIN32 MACOSX_BUNDLE ${PRIVATE_SOURCES} ${PLATFORM_SOURCES})
 
 if (WOWDECOMP_PLATFORM_MAC)
-    set(WOW_OUTPUT_NAME Wow)
+    set(WOW_OUTPUT_NAME "World of Warcraft")
 elseif (WOWDECOMP_ARCH_64)
     set(WOW_OUTPUT_NAME Wow64)
 else ()
@@ -37,14 +37,16 @@ if (WOWDECOMP_PLATFORM_WIN)
     target_link_options(Wow PRIVATE "/INCREMENTAL:NO" "/ENTRY:start")
 endif ()
 
-# On macOS Wow is bin/Mac/Wow.app. The game folder is the one holding the bundle, so Data/ and WTF/ sit next to it.
+# On macOS Wow is "bin/Mac/World of Warcraft.app", as Blizzard's Mac client was named. Like Wow.exe it belongs in the
+# game folder, next to Data/: cmake --install <build> --prefix <3.3.5a folder> puts it there. The game folder is the one
+# holding the bundle (or one chosen at launch when that has no Data; see WoW/Source/Mac/main.mm).
 if (WOWDECOMP_PLATFORM_MAC)
     wowdecomp_mac_bundle_icon(Wow Wow)
 
     set_target_properties(Wow PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/Mac/Info.plist.in
         MACOSX_BUNDLE_GUI_IDENTIFIER org.wowdecomp.wow
-        MACOSX_BUNDLE_BUNDLE_NAME Wow
+        MACOSX_BUNDLE_BUNDLE_NAME "World of Warcraft"
         MACOSX_BUNDLE_ICON_FILE Wow
         MACOSX_BUNDLE_SHORT_VERSION_STRING 3.3.5
         MACOSX_BUNDLE_BUNDLE_VERSION 12340
@@ -55,6 +57,8 @@ if (WOWDECOMP_PLATFORM_MAC)
         COMMAND codesign --force --sign - $<TARGET_BUNDLE_DIR:Wow>
         VERBATIM
     )
+
+    install(TARGETS Wow BUNDLE DESTINATION .)
 endif ()
 
 target_link_libraries(Wow
