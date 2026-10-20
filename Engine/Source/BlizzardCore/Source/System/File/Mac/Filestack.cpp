@@ -72,8 +72,20 @@ bool Valid(const Blizzard::File::StreamRecord* stream) {
     return stream->m_fileHandle != kInvalidHandle;
 }
 
+// The SD card's "sdmc:" device prefix, which libnx puts on the working directory. Paths here are '/'-rooted, which libnx
+// resolves on the SD card, so the absolute-path logic below (and the game's) applies unchanged.
+const char* SkipDevice(const char* path) {
+#if defined(__SWITCH__)
+    if (path && !strncmp(path, "sdmc:/", 6)) {
+        return path + 5;
+    }
+#endif
+
+    return path;
+}
+
 std::string NativePath(const char* path) {
-    std::string native = path ? path : "";
+    std::string native = path ? SkipDevice(path) : "";
     std::replace(native.begin(), native.end(), '\\', '/');
     return native;
 }
@@ -319,7 +331,7 @@ bool System_File::MakeAbsolutePath(Blizzard::File::Filesystem* fs, System_File::
             cwd[0] = '\0';
         }
 
-        path = std::string(cwd) + "/" + path;
+        path = std::string(SkipDevice(cwd)) + "/" + path;
     }
 
     std::string absolute = Canonicalize(path);
@@ -468,7 +480,7 @@ bool System_File::GetWorkingDirectory(Blizzard::File::Filesystem* fs, System_Fil
     char buffer[PATH_MAX];
 
     if (getcwd(buffer, sizeof(buffer))) {
-        FromNativeName(parms->m_cwdbuf, parms->m_cwdbuflen, buffer);
+        FromNativeName(parms->m_cwdbuf, parms->m_cwdbuflen, SkipDevice(buffer));
     }
 
     return true;

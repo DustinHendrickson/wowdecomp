@@ -17,7 +17,7 @@ void NxMainShutdown();
 // on the console or in an emulator leaves its output behind.
 void NxMainRedirectConsole();
 
-// The folder holding the NRO, from the path the loader gives, with a trailing slash.
+// The folder holding the NRO, from the path the loader gives, '/'-rooted (no "sdmc:") with a trailing slash.
 void NxMainGameFolder(char* buffer, size_t size);
 
 // Whether the folder has Data/ with MPQs in it.

@@ -84,8 +84,14 @@ void NxMainGameFolder(char* buffer, size_t size) {
     const char* slash = strrchr(path, '/');
 
     if (!slash) {
-        snprintf(buffer, size, "sdmc:/switch/wow/");
+        snprintf(buffer, size, "/switch/wow/");
         return;
+    }
+
+    // '/'-rooted, without the "sdmc:" device: libnx resolves those on the SD card, and the game's path code only takes
+    // paths starting with '/' as absolute.
+    if (!strncmp(path, "sdmc:/", 6)) {
+        path += 5;
     }
 
     size_t length = static_cast<size_t>(slash - path) + 1;
