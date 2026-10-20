@@ -18,8 +18,9 @@
 //
 // Keys map from hardware key codes: special keys through a table, character keys through the current keyboard layout
 // (UCKeyTranslate with no modifiers), which is what MapVirtualKey gives Windows: letters as upper case, punctuation
-// unshifted. The digit row maps by position to '0'..'9', as VK_0..VK_9 do. Command isn't a game key; Command shortcuts
-// go to the menu (Cmd+Q asks the game to close).
+// unshifted. The digit row maps by position to '0'..'9', as VK_0..VK_9 do. Command isn't a game key: Cmd+A/C/X/V become
+// Ctrl+A/C/X/V (select all, copy, cut, paste in edit boxes) and other Command shortcuts go to the menu (Cmd+Q asks the
+// game to close).
 
 #import <AppKit/AppKit.h>
 #import <Carbon/Carbon.h>
@@ -419,6 +420,29 @@ void ApplyMouseLock() {
 
 - (void)keyDown:(NSEvent*)event {
     if (event.modifierFlags & NSEventModifierFlagCommand) {
+        // Mac editing shortcuts: Cmd+A/C/X/V reach the game as Ctrl+A/C/X/V, the select all, copy, cut and paste its
+        // edit boxes know from Windows. The key events are queued with Ctrl around them, which is what the game checks
+        // when it handles them. Other Command shortcuts go to the menu.
+        KEY key;
+        NSEventModifierFlags others = NSEventModifierFlagControl | NSEventModifierFlagOption;
+
+        if (!(event.modifierFlags & others) && ConvertKeyCode(event.keyCode, &key) && (key == KEY_A || key == KEY_C || key == KEY_X || key == KEY_V)) {
+            bool control = s_keyDown[KEY_LCONTROL] || s_keyDown[KEY_RCONTROL];
+
+            if (!control) {
+                OsQueuePut(OS_INPUT_KEY_DOWN, KEY_LCONTROL, 1, 0, 0);
+            }
+
+            OsQueuePut(OS_INPUT_KEY_DOWN, key, 1, 0, 0);
+            OsQueuePut(OS_INPUT_KEY_UP, key, 1, 0, 0);
+
+            if (!control) {
+                OsQueuePut(OS_INPUT_KEY_UP, KEY_LCONTROL, 1, 0, 0);
+            }
+
+            return;
+        }
+
         [super keyDown:event];
         return;
     }

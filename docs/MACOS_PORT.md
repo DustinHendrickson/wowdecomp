@@ -337,6 +337,9 @@ layer. Apple may drop OpenGL at some point.
   points. The intro and cinematics play (checked with the Wrath intro). `WOWDECOMP_FRAMEDUMP="8,14"` writes the frame
   being presented at those seconds to `FrameDump_<seconds>.png`, which works where the game's screenshots don't
   (movies).
+- Keyboard: Cmd+A/C/X/V reach the game as Ctrl+A/C/X/V, the select all, copy, cut and paste its edit boxes already
+  handle; other Command shortcuts go to the menu (Cmd+Q quit, Cmd+H hide, Cmd+M minimize, Cmd+Ctrl+F full screen).
+- Windowed mode checked at 2048x1280 (a 1024x640-point window at 2x) and, with Retina off, at 1280x800.
 - Open: one earlier in-world crash that left no log, and Warden on servers that enforce it.
 
 ## Rules of the road

@@ -167,9 +167,17 @@ int main(int argc, char** argv) {
     CHECK(Has(events, OS_INPUT_KEY_DOWN, KEY_LALT) && Has(events, OS_INPUT_KEY_UP, KEY_LALT));
 
     // Command shortcuts aren't game keys.
+    // Cmd+C reaches the game as Ctrl+C (copy in edit boxes), without a character; other Command shortcuts stay with the
+    // menu.
     [window sendEvent:Key(window, NSEventTypeKeyDown, kVK_ANSI_C, @"c", NSEventModifierFlagCommand)];
     events = Drain();
-    CHECK(!Has(events, OS_INPUT_KEY_DOWN, KEY_C) && !Has(events, OS_INPUT_CHAR, 'c'));
+    CHECK(Has(events, OS_INPUT_KEY_DOWN, KEY_LCONTROL) && Has(events, OS_INPUT_KEY_DOWN, KEY_C) && Has(events, OS_INPUT_KEY_UP, KEY_C) && Has(events, OS_INPUT_KEY_UP, KEY_LCONTROL));
+    CHECK(!Has(events, OS_INPUT_CHAR, 'c'));
+    CHECK(!OsInputIsKeyDown(KEY_LCONTROL));
+
+    [window sendEvent:Key(window, NSEventTypeKeyDown, kVK_ANSI_J, @"j", NSEventModifierFlagCommand)];
+    events = Drain();
+    CHECK(!Has(events, OS_INPUT_KEY_DOWN, KEY_J) && !Has(events, OS_INPUT_KEY_DOWN, KEY_LCONTROL));
 
     // Mouse, top-left based content coordinates (events in points, reported in render pixels).
     [window sendEvent:Mouse(window, NSEventTypeMouseMoved, NSMakePoint(200, 100))];
