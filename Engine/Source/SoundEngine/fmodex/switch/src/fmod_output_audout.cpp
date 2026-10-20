@@ -4,6 +4,7 @@
 
 #include <switch.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "fmod_settings.h"
@@ -161,16 +162,24 @@ FMOD_RESULT OutputAudout::init(int selecteddriver, FMOD_INITFLAGS flags, int *ou
 
     *outputformat = FMOD_SOUND_FORMAT_PCM16;
 
-    if (R_FAILED(audoutInitialize()))
+    Result rc = audoutInitialize();
+
+    if (R_FAILED(rc))
     {
+        fprintf(stderr, "FMOD audout: audoutInitialize failed (0x%x, module %u, description %u)\n", rc, R_MODULE(rc), R_DESCRIPTION(rc));
         return FMOD_ERR_OUTPUT_INIT;
     }
 
-    if (R_FAILED(audoutStartAudioOut()))
+    rc = audoutStartAudioOut();
+
+    if (R_FAILED(rc))
     {
+        fprintf(stderr, "FMOD audout: audoutStartAudioOut failed (0x%x, module %u, description %u)\n", rc, R_MODULE(rc), R_DESCRIPTION(rc));
         audoutExit();
         return FMOD_ERR_OUTPUT_INIT;
     }
+
+    fprintf(stderr, "FMOD audout: %u Hz, %u channels, FMOD mixes %d channels\n", audoutGetSampleRate(), audoutGetChannelCount(), outputchannels);
 
     mAudoutStarted = true;
     *outputrate = (int)audoutGetSampleRate();

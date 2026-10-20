@@ -44,7 +44,9 @@ set(NX_SYSTEM_INCLUDES
     "-isystem ${NX_ROOT}/include -isystem ${NX_PORTLIBS}/include -isystem ${DEVKITA64}/aarch64-none-elf/include"
 )
 
-set(NX_COMMON_FLAGS "${NX_ARCH_FLAGS} -ffunction-sections -fdata-sections -D__SWITCH__")
+# char is unsigned in the AArch64 ELF ABI, but signed with MSVC (and on Apple arm64), which the decompiled code assumes:
+# hashes, signature checks and byte math over char would come out different.
+set(NX_COMMON_FLAGS "${NX_ARCH_FLAGS} -fsigned-char -ffunction-sections -fdata-sections -D__SWITCH__")
 set(CMAKE_C_FLAGS_INIT "${NX_COMMON_FLAGS} ${NX_SYSTEM_INCLUDES}")
 # libstdc++ first: its <cstdlib> and friends #include_next the newlib headers that follow.
 set(CMAKE_CXX_FLAGS_INIT
