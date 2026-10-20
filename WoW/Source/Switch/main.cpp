@@ -5,8 +5,11 @@
 // so it runs here on a thread with an 8 MB stack: the loader's main thread has much less.
 
 #include <pthread.h>
+#include <sys/stat.h>
 #include <cstdio>
+#include <cstring>
 #include <string>
+#include <vector>
 #include <unistd.h>
 #include "Engine/Source/BlizzardCore/Source/System/Process/Mac/GameDirectory.h"
 #include "Engine/Source/Storm/H/storm.h"
@@ -16,6 +19,64 @@
 namespace {
 
 int s_result;
+
+// The client's default resolutions are 4:3 (from its hardware table), and with widescreen on gxResolution only takes the
+// 16:9 sizes the Switch offers (Gx/CGxDevice/Switch), so a default size is refused and gxResolution is left empty, which
+// the glue screens can't parse. Before the client reads WTF/Config.wtf, a gxResolution that isn't a Switch size becomes
+// 1280x720, and a new config skips the hardware detection that would pick a 4:3 size again.
+void PrepareConfig() {
+    std::vector<std::string> lines;
+    bool haveResolution = false;
+    bool haveDetect = false;
+
+    if (FILE* file = fopen("WTF/Config.wtf", "r")) {
+        char line[1024];
+
+        while (fgets(line, sizeof(line), file)) {
+            std::string text = line;
+
+            while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) {
+                text.pop_back();
+            }
+
+            if (!strncasecmp(text.c_str(), "SET gxResolution ", 17)) {
+                if (text.find("\"1280x720\"") == std::string::npos && text.find("\"1920x1080\"") == std::string::npos) {
+                    continue;
+                }
+
+                haveResolution = true;
+            } else if (!strncasecmp(text.c_str(), "SET hwDetect ", 13)) {
+                haveDetect = true;
+            }
+
+            lines.push_back(text);
+        }
+
+        fclose(file);
+    }
+
+    if (haveResolution && haveDetect) {
+        return;
+    }
+
+    if (!haveResolution) {
+        lines.push_back("SET gxResolution \"1280x720\"");
+    }
+
+    if (!haveDetect) {
+        lines.push_back("SET hwDetect \"0\"");
+    }
+
+    mkdir("WTF", 0777);
+
+    if (FILE* file = fopen("WTF/Config.wtf", "w")) {
+        for (const std::string& line : lines) {
+            fprintf(file, "%s\n", line.c_str());
+        }
+
+        fclose(file);
+    }
+}
 
 void* ClientThread(void* param) {
     StormRtlInitialize();
@@ -44,6 +105,7 @@ int main() {
     MacSetGameDirectory(folder);
     chdir(folder);
     NxMainRedirectConsole();
+    PrepareConfig();
 
     pthread_attr_t attributes;
     pthread_attr_init(&attributes);
