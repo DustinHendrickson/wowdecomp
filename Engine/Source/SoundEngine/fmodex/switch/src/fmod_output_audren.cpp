@@ -193,7 +193,7 @@ FMOD_RESULT OutputAudren::init(int selecteddriver, FMOD_INITFLAGS flags, int *ou
     }
 
     mBufferFrames = bufferlength * numbuffers;
-    mHwFrames     = bufferlength;
+    mHwFrames     = HWFRAMES;
     mBuffer       = (short *)FMOD_Memory_Calloc(mBufferFrames * mChannels * sizeof(short));
     if (!mBuffer)
     {

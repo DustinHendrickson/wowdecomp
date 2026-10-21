@@ -23,7 +23,12 @@ namespace FMOD
     {
       private:
 
-        enum { NUMHWBUFFERS = 3 };  /* queued ahead: fewer than FMOD's blocks, so the mixer refills a block before it plays again */
+        /*
+            Small wave buffers, a few queued: what is queued is how far "played" runs ahead of what is heard, on top of
+            FMOD's own ring. Whole FMOD blocks (21 ms each) made the sound late; 5 ms slices keep it to about 20 ms, as
+            CoreAudio's small pulls do on macOS.
+        */
+        enum { NUMHWBUFFERS = 4, HWFRAMES = 256 };
 
         void                       *mDriver;                      /* AudioDriver */
         void                       *mPool;                        /* the wave buffers' memory */
