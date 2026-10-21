@@ -69,6 +69,9 @@ nxlink -s bin/Switch/WoW.nro
 (the Homebrew Menu must be open with its nxlink server running: press Y in it). The NRO's folder is then `sdmc:/switch/`,
 so put `Data` there or pass the NRO's final path with `-p switch/wow/WoW.nro`.
 
+Closing the game from the HOME menu asks it to quit (the exit is locked until it has), so it logs out and saves the UI's
+saved variables, key bindings and settings as Exit Game does; if quitting takes over 15 seconds the system ends it.
+
 Without nxlink, stdout and stderr go to `Logs/Console.txt` in the game folder, written by a background thread so the
 game never waits on the SD card (a card write can take tens of milliseconds); after a crash, output goes straight to
 the file. Every 5 seconds a `Perf:` line gives the frame rate, the slowest frame, FMOD's CPU use and the audio

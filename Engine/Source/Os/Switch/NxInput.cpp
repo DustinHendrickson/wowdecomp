@@ -34,10 +34,38 @@ void NxInputInitialize() {
 
     // Keep receiving focus changes, so the game hears about the HOME menu as a window losing focus.
     appletSetFocusHandlingMode(AppletFocusHandlingMode_SuspendHomeSleepNotify);
+
+    // Closing from the HOME menu becomes a request the game answers by quitting properly (NxInputPumpApplet).
+    appletLockExit();
+}
+
+// Closing the game from the HOME menu asks it to quit rather than ending the process there and then (appletLockExit in
+// NxInputInitialize), so it logs out and saves the UI's saved variables and settings as Exit Game does. Should quitting
+// hang, the exit is unlocked after a while and the system ends the process after all.
+void ExitWatchdog(void* argument) {
+    svcSleepThread(15000000000ULL);
+    appletUnlockExit();
 }
 
 bool NxInputPumpApplet() {
-    return appletMainLoop();
+    static bool s_exitRequested;
+
+    if (appletMainLoop()) {
+        return true;
+    }
+
+    if (!s_exitRequested) {
+        s_exitRequested = true;
+        fprintf(stderr, "Exit requested from the HOME menu: quitting\n");
+
+        static Thread s_watchdog;
+
+        if (R_SUCCEEDED(threadCreate(&s_watchdog, ExitWatchdog, nullptr, nullptr, 0x4000, 0x2C, -2))) {
+            threadStart(&s_watchdog);
+        }
+    }
+
+    return false;
 }
 
 void NxInputPoll(NxInputState* state) {

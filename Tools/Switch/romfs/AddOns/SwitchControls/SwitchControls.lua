@@ -869,6 +869,14 @@ local function ApplySwitchVideoPreset()
     end
 end
 
+local function Step(name, step, ...)
+    local ok, message = pcall(step, ...)
+
+    if not ok then
+        Log(name .. " failed: " .. tostring(message))
+    end
+end
+
 local entered = false
 
 frame:RegisterEvent("ADDON_LOADED")
@@ -897,24 +905,29 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         -- Only the first time: it also fires after every loading screen.
         if not entered then
             entered = true
-            SetOverrideBindingClick(frame, false, "F19", "SwitchControlsHelpToggle")
-            BindInteract(false)
-            SetUpVideoOptions()
-            ApplySwitchVideoPreset()
+            Log("in the world")
+
+            -- Each step on its own, so one failing (an error is logged) doesn't keep the others, play mode above all,
+            -- from happening.
+            Step("help binding", SetOverrideBindingClick, frame, false, "F19", "SwitchControlsHelpToggle")
+            Step("interact binding", BindInteract, false)
+            Step("video options", SetUpVideoOptions)
+            Step("video preset", ApplySwitchVideoPreset)
 
             if not NeedsCursor() then
                 SwitchControls_SetMode("play")
             end
 
-            pcall(LogLabels)
+            Step("labels", LogLabels)
 
-            if not SwitchControlsDB.helpSeen then
-                SwitchControlsDB.helpSeen = true
+            -- Kept natively like the options: the saved variables aren't written when the game is closed from HOME.
+            if not SwitchControls_GetOption("helpSeen") and not SwitchControlsDB.helpSeen then
+                SwitchControls_SetOption("helpSeen", true)
                 help:Show()
             end
         end
 
-        UpdateAllHotkeys()
+        Step("hotkeys", UpdateAllHotkeys)
     elseif event == "UPDATE_BINDINGS" then
         UpdateAllHotkeys()
     elseif event == "VARIABLES_LOADED" then

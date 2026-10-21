@@ -197,6 +197,9 @@ void NxMainRedirectConsole() {
 void NxMainShutdown() {
     wowdecomp_switch_console_sync();
 
+    // The exit lock the input layer takes, so closing from the HOME menu quits the game properly; it's done now.
+    appletUnlockExit();
+
     if (s_nxlink >= 0) {
         close(s_nxlink);
         s_nxlink = -1;
