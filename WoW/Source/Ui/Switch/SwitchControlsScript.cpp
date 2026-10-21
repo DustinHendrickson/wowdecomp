@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include "WoW/Source/Ui/Switch/SwitchControlsScript.h"
 #include "Engine/Source/FrameScript/FrameScript.h"
@@ -25,6 +26,17 @@ int32_t Script_SwitchControls_SetMode(lua_State* L) {
     return 0;
 }
 
+// A line in Logs/Console.txt, for diagnosing the add-on on the console.
+int32_t Script_SwitchControls_Log(lua_State* L) {
+    const char* text = lua_tostring(L, 1);
+
+    if (text) {
+        fprintf(stderr, "SwitchControls: %s\n", text);
+    }
+
+    return 0;
+}
+
 int32_t Script_SwitchControls_IsDocked(lua_State* L) {
     lua_pushboolean(L, SwitchIsDocked());
     return 1;
@@ -37,6 +49,7 @@ const struct {
     { "SwitchControls_GetMode", &Script_SwitchControls_GetMode },
     { "SwitchControls_SetMode", &Script_SwitchControls_SetMode },
     { "SwitchControls_IsDocked", &Script_SwitchControls_IsDocked },
+    { "SwitchControls_Log", &Script_SwitchControls_Log },
 };
 
 }

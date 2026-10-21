@@ -8,6 +8,7 @@
 //                                                         or a USB mouse is in use
 //   SwitchControls_SetMode("play" | "cursor")
 //   docked = SwitchControls_IsDocked()
+//   SwitchControls_Log(text)                              a line in Logs/Console.txt
 
 void SwitchControlsRegisterScriptFunctions();
 void SwitchControlsUnregisterScriptFunctions();

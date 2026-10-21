@@ -75,22 +75,47 @@ end
 local frame = CreateFrame("Frame", "SwitchControlsFrame", UIParent)
 
 ---------------------------------------------------------------------------------------------------------------------
--- Building blocks. Button icons are textures next to their labels, never |T escapes inside text: this client drops the
--- text that follows an inline texture.
+-- Building blocks. Button icons are textures next to their labels, not |T escapes inside text, and labels use
+-- Blizzard's font objects (the ones the default UI draws with) rather than fonts set by hand: on the Switch, text set up
+-- either other way didn't show. Frames are scaled up as a whole for the handheld screen.
 
-local FONT = "Fonts\\FRIZQT__.TTF"
-local GOLD = { 1, 0.82, 0 }
+local FONTS = {
+    title = "GameFontNormalHuge",      -- gold, large
+    heading = "GameFontNormalLarge",   -- gold
+    text = "GameFontHighlightLarge",   -- white
+    hint = "GameFontDisableLarge",     -- grey
+}
 
-local function Label(parent, size, color)
-    local label = parent:CreateFontString(nil, "OVERLAY")
-    label:SetFont(FONT, size, "OUTLINE")
-    label:SetShadowOffset(1, -1)
+-- Every label, for the diagnostic below.
+local labels = {}
 
-    if color then
-        label:SetTextColor(color[1], color[2], color[3])
+local function Label(parent, style)
+    local label = parent:CreateFontString(nil, "OVERLAY", FONTS[style])
+    table.insert(labels, label)
+    return label
+end
+
+-- Logs/Console.txt on the Switch: each label's font and measured width, so text that doesn't show can be told apart
+-- from a font that didn't load (width 0) or text that isn't drawn.
+local function LogLabels()
+    if not SwitchControls_Log then
+        return
     end
 
-    return label
+    local shown = 0
+
+    for _, label in ipairs(labels) do
+        local font, size, flags = label:GetFont()
+        local r, g, b, a = label:GetTextColor()
+
+        if shown < 12 then
+            SwitchControls_Log(string.format("label %q font %s %s %s width %.1f height %.1f color %.2f %.2f %.2f %.2f alpha %.2f visible %s", label:GetText() or "", tostring(font), tostring(size), tostring(flags), label:GetStringWidth() or -1, label:GetHeight() or -1, r or -1, g or -1, b or -1, a or -1, label:GetEffectiveAlpha() or -1, tostring((label:IsVisible()))))
+            shown = shown + 1
+        end
+    end
+
+    local bar = SwitchControlsHintBar
+    SwitchControls_Log(string.format("%d labels; hint bar %.0fx%.0f scale %.2f shown %s", #labels, bar:GetWidth() or -1, bar:GetHeight() or -1, bar:GetEffectiveScale() or -1, tostring((bar:IsVisible()))))
 end
 
 -- Icons for the given glyph names in a row from the left of the anchor; returns the row's width.
@@ -107,12 +132,12 @@ local function Icons(parent, glyphs, size, anchor, x, y)
 end
 
 -- A row of text and icons from the left of the anchor, at x: items are strings or { glyph }. Returns the new x.
-local function Sequence(parent, items, size, fontSize, color, anchor, x)
+local function Sequence(parent, items, size, style, anchor, x)
     for _, item in ipairs(items) do
         if type(item) == "table" then
             x = x + Icons(parent, item, size, anchor, x, 0) + 4
         else
-            local label = Label(parent, fontSize, color)
+            local label = Label(parent, style)
             label:SetText(item)
             label:SetPoint("LEFT", anchor, "LEFT", x, 0)
             x = x + label:GetStringWidth() + 6
@@ -141,8 +166,6 @@ local HINTS = {
         { "LStick", "Move" },
         { "RStick", "Look" },
         { "B", "Jump" },
-        { "A", "X", "Y", "Actions 1-3" },
-        { "Dpad", "Actions 4-7" },
         { "R", "Target" },
         { "Plus", "Menu" },
         { "Minus", "Cursor" },
@@ -167,11 +190,12 @@ local HINTS = {
     },
 }
 
-local HINT_ICON = 30
-local HINT_FONT = 16
+local HINT_ICON = 24
+local HINT_SCALE = 1.3
 
 local hintBar = CreateFrame("Frame", "SwitchControlsHintBar", UIParent)
 hintBar:SetFrameStrata("HIGH")
+hintBar:SetScale(HINT_SCALE)
 hintBar:SetHeight(HINT_ICON + 14)
 hintBar:SetPoint("TOP", UIParent, "TOP", 0, -2)
 hintBar:SetBackdrop({
@@ -197,7 +221,7 @@ for state, hints in pairs(HINTS) do
     row:Hide()
 
     local x = 14
-    local title = Label(row, HINT_FONT + 1, GOLD)
+    local title = Label(row, "heading")
     title:SetText(hints.title)
     title:SetPoint("LEFT", row, "LEFT", x, 0)
     x = x + title:GetStringWidth() + 20
@@ -206,14 +230,14 @@ for state, hints in pairs(HINTS) do
         local glyphs, text = Split(hint)
         x = x + Icons(row, glyphs, HINT_ICON, row, x, 0) + 4
 
-        local label = Label(row, HINT_FONT)
+        local label = Label(row, "text")
         label:SetText(text)
         label:SetPoint("LEFT", row, "LEFT", x, 0)
         x = x + label:GetStringWidth() + 18
     end
 
-    -- How to get the full list: hold Minus, or tap the bar.
-    x = Sequence(row, { "Hold", { "Minus" }, "or tap: all controls" }, HINT_ICON - 6, HINT_FONT - 2, { 0.7, 0.7, 0.7 }, row, x)
+    -- How to get the full list: hold Minus, or tap the bar. (The action bars show their own buttons.)
+    x = Sequence(row, { "Hold", { "Minus" }, "all controls" }, HINT_ICON, "hint", row, x + 6)
 
     row.width = x + 8
     hintRows[state] = row
@@ -269,13 +293,14 @@ local HELP_COLUMNS = {
     },
 }
 
-local HELP_ICON = 32
-local HELP_FONT = 17
-local HELP_ROW = 38
-local HELP_COLUMN = 400
+local HELP_ICON = 28
+local HELP_ROW = 32
+local HELP_COLUMN = 330
+local HELP_SCALE = 1.25
 
 local help = CreateFrame("Frame", "SwitchControlsHelp", UIParent)
 help:SetFrameStrata("DIALOG")
+help:SetScale(HELP_SCALE)
 help:SetToplevel(true)
 help:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 help:SetBackdrop({
@@ -290,7 +315,7 @@ help:EnableMouse(true)
 help:Hide()
 table.insert(UISpecialFrames, "SwitchControlsHelp")
 
-local helpTitle = Label(help, 26, GOLD)
+local helpTitle = Label(help, "title")
 helpTitle:SetText("Controller")
 helpTitle:SetPoint("TOP", help, "TOP", 0, -22)
 
@@ -303,7 +328,7 @@ do
 
         for _, entry in ipairs(entries) do
             if entry.title then
-                local heading = Label(help, HELP_FONT + 2, GOLD)
+                local heading = Label(help, "heading")
                 heading:SetText(entry.title)
                 heading:SetPoint("TOPLEFT", help, "TOPLEFT", x, y - 6)
                 y = y - HELP_ROW
@@ -315,7 +340,7 @@ do
                 anchor:SetPoint("TOPLEFT", help, "TOPLEFT", x, y)
                 Icons(help, glyphs, HELP_ICON, anchor, 0, 0)
 
-                local label = Label(help, HELP_FONT)
+                local label = Label(help, "text")
                 label:SetText(text)
                 label:SetPoint("LEFT", anchor, "LEFT", 3 * (HELP_ICON - 2) + 12, 0)
                 y = y - HELP_ROW
@@ -332,7 +357,7 @@ do
     closeAnchor:SetWidth(1)
     closeAnchor:SetHeight(HELP_ICON)
     closeAnchor:SetPoint("BOTTOMLEFT", help, "BOTTOMLEFT", 30, 26)
-    Sequence(help, { "Hold", { "Minus" }, "or press", { "Plus" }, "to close" }, HELP_ICON - 4, HELP_FONT - 1, { 0.75, 0.75, 0.75 }, closeAnchor, 0)
+    Sequence(help, { "Hold", { "Minus" }, "or press", { "Plus" }, "to close" }, HELP_ICON - 4, "hint", closeAnchor, 0)
 
     local close = CreateFrame("Button", nil, help, "UIPanelButtonTemplate")
     close:SetWidth(180)
@@ -532,6 +557,8 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             if not NeedsCursor() then
                 SwitchControls_SetMode("play")
             end
+
+            pcall(LogLabels)
 
             if not SwitchControlsDB.helpSeen then
                 SwitchControlsDB.helpSeen = true
