@@ -106,9 +106,6 @@ void *OutputAudren::feederThread(void *param)
 
     wowdecomp_switch_thread_start(WOWDECOMP_THREAD_AUDIO_OUTPUT);
 
-    /* Underruns (every buffer played out before it was refilled), reported every few seconds in Logs/Console.txt. */
-    unsigned int underruns = 0;
-    u64          lastReport = armGetSystemTick();
 
     /*
         Keep every wave buffer queued: one that has played (or was never queued) is refilled from the ring and queued
@@ -129,17 +126,17 @@ void *OutputAudren::feederThread(void *param)
             }
         }
 
+        /* Every buffer played out before it was refilled: an underrun, for the performance report. */
         if (idle == NUMHWBUFFERS && output->mPlayed)
         {
-            underruns++;
+            wowdecomp_switch_perf_audio_underrun();
         }
 
-        if (underruns && armTicksToNs(armGetSystemTick() - lastReport) >= 5000000000ull)
+        if (idle)
         {
-            fprintf(stderr, "FMOD audren: %u underruns in the last 5 s\n", underruns);
-            underruns = 0;
-            lastReport = armGetSystemTick();
+            wowdecomp_switch_perf_audio_refill();
         }
+
 
         for (int i = 0; i < NUMHWBUFFERS; i++)
         {

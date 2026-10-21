@@ -12,6 +12,12 @@ struct XvidDecoderSlot {
 static XvidDecoderSlot s_slots[16];
 static bool s_globalInitialized;
 
+#if defined(__SWITCH__)
+// Movie frame decode times for the Switch's performance report (Engine/Source/Os/Switch/NxPerf.cpp).
+extern "C" void wowdecomp_switch_perf_movie_decode(uint64_t microseconds);
+extern "C" uint64_t wowdecomp_switch_perf_now_us(void);
+#endif
+
 static bool ValidSlot(int32_t decoder) {
     return decoder >= 0 && decoder < static_cast<int32_t>(sizeof(s_slots) / sizeof(s_slots[0]));
 }
@@ -99,9 +105,17 @@ int32_t DivxDecode(int32_t decoder, DivxDecodeFrame* frame, int32_t flags) {
         decode.output.csp = XVID_CSP_NULL;
     }
 
+#if defined(__SWITCH__)
+    uint64_t start = wowdecomp_switch_perf_now_us();
+#endif
+
     if (xvid_decore(slot.m_handle, XVID_DEC_DECODE, &decode, nullptr) < 0) {
         return 1;
     }
+
+#if defined(__SWITCH__)
+    wowdecomp_switch_perf_movie_decode(wowdecomp_switch_perf_now_us() - start);
+#endif
 
     return 0;
 }

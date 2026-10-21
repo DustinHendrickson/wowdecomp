@@ -2701,6 +2701,16 @@ int32_t SE2::HeartBeat(const void* data, void* param) {
 
     s_system->update();
 
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+    {
+        float dsp, stream, update, total;
+
+        if (s_system->getCPUUsage(&dsp, &stream, &update, &total) == FMOD_OK) {
+            wowdecomp_switch_perf_fmod(dsp, stream, update, total);
+        }
+    }
+#endif
+
     if (SE2::sm_bCaptureInitialized && s_chatSystem != s_system) {
         s_chatSystem->update();
     }

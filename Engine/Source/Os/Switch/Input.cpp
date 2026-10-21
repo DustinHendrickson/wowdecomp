@@ -963,6 +963,7 @@ void PollKeyboardRequest() {
 }
 
 void Poll() {
+    wowdecomp_switch_perf_frame();
     uint64_t now = OsGetAsyncTimeMs();
     float seconds = s_lastPollMs ? static_cast<float>(now - s_lastPollMs) / 1000.0f : 0.0f;
     s_lastPollMs = now;

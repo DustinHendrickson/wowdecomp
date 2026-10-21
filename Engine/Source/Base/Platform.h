@@ -85,6 +85,21 @@ extern "C"
 #endif
 void wowdecomp_switch_thread_start(int role);
 
+// The performance report in Logs/Console.txt (Os/Switch/NxPerf.cpp): the game's frames, the audio output's refills and
+// underruns, movie frame decode times and FMOD's CPU use feed it.
+#if defined(__cplusplus)
+extern "C" {
+#endif
+void wowdecomp_switch_perf_frame(void);
+void wowdecomp_switch_perf_audio_refill(void);
+void wowdecomp_switch_perf_audio_underrun(void);
+void wowdecomp_switch_perf_movie_decode(uint64_t microseconds);
+void wowdecomp_switch_perf_fmod(float dsp, float stream, float update, float total);
+uint64_t wowdecomp_switch_perf_now_us(void);
+#if defined(__cplusplus)
+}
+#endif
+
 // Thread names and Mach thread ports: neither exists on the Switch. The thread id is the pthread's, truncated.
 #define pthread_setname_np(...) 0
 static inline uint32_t pthread_mach_thread_np(pthread_t thread) {
