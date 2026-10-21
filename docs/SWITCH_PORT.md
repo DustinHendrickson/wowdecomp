@@ -98,7 +98,8 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 | B | jump (Space) | A or ZR | left click (hold to drag) |
 | A, X, Y | action keys 1, 2, 3 | B or ZL | right click |
 | D-pad right, up, left, down | action keys 4, 5, 6, 7 | D-pad up / down | mouse wheel |
-| L | action key 8 | Y | Enter (opens chat) |
+| L (tap) | action key 8 | Y | Enter (opens chat) |
+| L (hold) + right stick up / down | zoom the camera | | |
 | R | Tab (next enemy) | X | the controls list |
 | ZL, ZR (hold) | Shift, Ctrl, for more bindings | | |
 
@@ -110,10 +111,12 @@ Key Bindings.
 **On screen** (the built-in SwitchControls add-on, packed in `WoW.nro` and installed into `Interface/AddOns` at every
 start, so it always matches the build):
 
-- A hint bar at the top of the screen names the mode (play, cursor, typing) and shows what the buttons do in it.
-  Tapping it opens the controls list.
+- A hint bar at the top of the screen names the mode (play, cursor, typing) and shows what the buttons do in it. It
+  dims after a few seconds and comes back when the mode changes. Tapping it opens the controls list.
 - Action buttons are labeled with the controller buttons that press them (A, ZL+X, D-pad, ...) instead of key names.
   Keys no controller button sends keep their usual labels.
+- The controls list has two options: **Hint bar** on / off, and **Invert camera** (the right stick's up and down; the
+  game's own mouse invert doesn't reach the stick).
 - A controls list opens the first time you enter the world. Hold **Minus**, tap the hint bar, or press **X** in cursor
   mode to open it again; the same, **Plus**, or its Close button closes it. (`/switch hints` turns the hint bar off and
   on, for a USB keyboard.)

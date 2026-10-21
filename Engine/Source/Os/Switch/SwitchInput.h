@@ -29,6 +29,9 @@ SwitchControllerState SwitchGetControllerState();
 void SwitchSetCursorMode(bool cursorMode);
 bool SwitchIsDocked();
 
+// Controller options from the SwitchControls add-on: "invertLook" (the right stick's up and down in play mode).
+void SwitchSetOption(const char* name, bool value);
+
 // 0 Control, 1 Shift, 2 Alt, as OsGuiIsModifierKeyDown takes them.
 int32_t SwitchIsModifierDown(int32_t modifier);
 

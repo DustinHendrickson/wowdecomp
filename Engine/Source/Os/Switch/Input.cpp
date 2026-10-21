@@ -26,6 +26,7 @@
 //   A X Y        1 2 3                 B / ZL       right click
 //   D-pad        4 5 6 7 (> ^ < v)     D-pad ^ v    mouse wheel
 //   L R          8, Tab (target)       Y            Enter (open chat)
+//   L (hold) + right stick up / down: zoom the camera (the mouse wheel); L alone is 8, sent on release
 //   ZL ZR (hold) Shift, Ctrl           X            F19 (the SwitchControls add-on's controls list)
 //
 //   In both: L3 is autorun (Num Lock), Plus is Escape. Play mode hides the cursor (touching the screen or moving a USB
@@ -137,6 +138,7 @@ enum OutputType {
     Output_ToggleCursor,
     Output_MinusHold,
     Output_Keyboard,
+    Output_LHold,
 };
 
 struct Output {
@@ -150,6 +152,16 @@ const uint64_t kButtons[] = {
 };
 
 Output s_outputs[16];
+
+// L: a tap is action button 8; held, the right stick zooms the camera (the mouse wheel) instead of looking around.
+const float kZoomNotchesPerSecond = 10.0f;
+bool s_lHeld;
+bool s_lUsed;
+float s_zoomRemainder;
+
+// Up on the right stick looks down when set (the SwitchControls add-on's "Invert camera"). The controller's own
+// setting: the game's mouseInvertPitch doesn't reach the stick.
+bool s_invertLook;
 
 // Minus: a short press switches modes, a long one opens the controls list.
 const uint32_t kMinusHoldMs = 500;
@@ -571,7 +583,7 @@ Output Mapping(uint64_t button) {
             key(KEY_NUMLOCK);
             return output;
         case NxButton_L:
-            key(KEY_8);
+            output.type = Output_LHold;
             return output;
         case NxButton_R:
             key(KEY_TAB);
@@ -669,6 +681,11 @@ void PressOutput(const Output& output) {
         case Output_Keyboard:
             RequestKeyboard();
             break;
+        case Output_LHold:
+            s_lHeld = true;
+            s_lUsed = false;
+            s_zoomRemainder = 0.0f;
+            break;
         default:
             break;
     }
@@ -681,6 +698,14 @@ void ReleaseOutput(const Output& output) {
             break;
         case Output_Mouse:
             PutMouseButton(static_cast<MOUSEBUTTON>(output.value), false);
+            break;
+        case Output_LHold:
+            // A tap is action button 8; held with the right stick it zoomed the camera instead.
+            if (s_lHeld && !s_lUsed) {
+                TapKey(KEY_8);
+            }
+
+            s_lHeld = false;
             break;
         case Output_MinusHold:
             // A short press switches modes; a long one already opened the controls list.
@@ -777,9 +802,31 @@ void PollRightStick(const NxStick& stick, float seconds) {
         scale = amount * amount / magnitude;
     }
 
+    // Holding L, up and down zoom the camera, as the mouse wheel does, over the world in the middle of the screen.
+    if (s_lHeld && !s_cursorMode && !TextMode()) {
+        if (active && std::fabs(stick.y) > std::fabs(stick.x)) {
+            s_lUsed = true;
+
+            if (!s_looking) {
+                MoveMouseTo(ScreenCenter());
+            }
+
+            s_zoomRemainder += stick.y * scale * magnitude * kZoomNotchesPerSecond * seconds;
+            int32_t notches = static_cast<int32_t>(s_zoomRemainder);
+
+            if (notches) {
+                s_zoomRemainder -= notches;
+                PutWheel(notches);
+            }
+        }
+
+        return;
+    }
+
     float speed = (s_cursorMode ? kCursorSpeed : kLookSpeed) * static_cast<float>(s_contentHeight) * seconds;
+    float lookY = !s_cursorMode && s_invertLook ? -stick.y : stick.y;
     s_cursorRemainderX += stick.x * scale * speed;
-    s_cursorRemainderY -= stick.y * scale * speed;
+    s_cursorRemainderY -= lookY * scale * speed;
     int32_t dx = static_cast<int32_t>(s_cursorRemainderX);
     int32_t dy = static_cast<int32_t>(s_cursorRemainderY);
     s_cursorRemainderX -= dx;
@@ -1366,6 +1413,12 @@ SwitchControllerState SwitchGetControllerState() {
 
 void SwitchSetCursorMode(bool cursorMode) {
     SetCursorMode(cursorMode);
+}
+
+void SwitchSetOption(const char* name, bool value) {
+    if (!strcmp(name, "invertLook")) {
+        s_invertLook = value;
+    }
 }
 
 bool SwitchIsDocked() {

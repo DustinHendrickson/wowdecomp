@@ -165,9 +165,9 @@ local HINTS = {
         title = "PLAY",
         { "LStick", "Move" },
         { "RStick", "Look" },
+        { "L", "RStick", "Zoom" },
         { "B", "Jump" },
         { "R", "Target" },
-        { "Plus", "Menu" },
         { "Minus", "Cursor" },
     },
     cursor = {
@@ -175,9 +175,7 @@ local HINTS = {
         { "RStick", "Pointer" },
         { "A", "Click" },
         { "B", "Right-click" },
-        { "DpadUp", "DpadDown", "Scroll" },
         { "Y", "Chat" },
-        { "Plus", "Close" },
         { "Minus", "Play" },
     },
     text = {
@@ -186,12 +184,16 @@ local HINTS = {
         { "B", "Cancel" },
         { "X", "Next field" },
         { "Y", "Keyboard" },
-        { "DpadLeft", "DpadRight", "Move in text" },
     },
 }
 
-local HINT_ICON = 24
-local HINT_SCALE = 1.3
+-- Narrow enough to sit between the target frame and the minimap at the top of a 720p screen.
+local HINT_ICON = 22
+local HINT_SCALE = 1.0
+
+-- The bar dims after a few seconds in the same mode and comes back when the mode changes.
+local HINT_DIM_AFTER = 4
+local HINT_DIM_ALPHA = 0.35
 
 local hintBar = CreateFrame("Frame", "SwitchControlsHintBar", UIParent)
 hintBar:SetFrameStrata("HIGH")
@@ -237,16 +239,25 @@ for state, hints in pairs(HINTS) do
     end
 
     -- How to get the full list: hold Minus, or tap the bar. (The action bars show their own buttons.)
-    x = Sequence(row, { "Hold", { "Minus" }, "all controls" }, HINT_ICON, "hint", row, x + 6)
+    x = Sequence(row, { "Hold", { "Minus" }, "help" }, HINT_ICON, "hint", row, x + 6)
 
     row.width = x + 8
     hintRows[state] = row
 end
 
 local shownHints
+local shownSince = 0
 
 local function ShowHints(state)
     if state == shownHints then
+        local age = GetTime() - shownSince
+        local alpha = 1
+
+        if age > HINT_DIM_AFTER then
+            alpha = math.max(HINT_DIM_ALPHA, 1 - (age - HINT_DIM_AFTER) * 2 * (1 - HINT_DIM_ALPHA))
+        end
+
+        hintBar:SetAlpha(alpha)
         return
     end
 
@@ -255,8 +266,10 @@ local function ShowHints(state)
     end
 
     shownHints = state
+    shownSince = GetTime()
     hintRows[state]:Show()
     hintBar:SetWidth(hintRows[state].width)
+    hintBar:SetAlpha(1)
 end
 
 ---------------------------------------------------------------------------------------------------------------------
@@ -271,11 +284,11 @@ local HELP_COLUMNS = {
         { "B", "Jump" },
         { "A", "X", "Y", "Action buttons 1, 2, 3" },
         { "Dpad", "Action buttons 4 to 7" },
-        { "L", "Action button 8" },
+        { "L", "Tap: action button 8" },
+        { "L", "RStick", "Hold L: zoom camera" },
         { "R", "Target nearest enemy" },
         { "ZL", "ZR", "Hold: Shift / Ctrl bindings" },
         { "LStickClick", "Autorun" },
-        { "Plus", "Menu, close, clear target" },
     },
     {
         { title = "Cursor mode" },
@@ -287,6 +300,7 @@ local HELP_COLUMNS = {
         { title = "Switching" },
         { "Minus", "Play / cursor mode" },
         { "Minus", "Hold: this list" },
+        { "Plus", "Menu, close, clear target" },
         { title = "Typing" },
         { "A", "Send", },
         { "Y", "Keyboard again" },
@@ -359,6 +373,35 @@ do
     closeAnchor:SetPoint("BOTTOMLEFT", help, "BOTTOMLEFT", 30, 26)
     Sequence(help, { "Hold", { "Minus" }, "or press", { "Plus" }, "to close" }, HELP_ICON - 4, "hint", closeAnchor, 0)
 
+    -- Options, big enough to tap.
+    local function Toggle(key, text, x, onChange)
+        local button = CreateFrame("Button", nil, help, "UIPanelButtonTemplate")
+        button:SetWidth(200)
+        button:SetHeight(40)
+        button:SetPoint("BOTTOMLEFT", help, "BOTTOMLEFT", x, 70)
+
+        local function Refresh()
+            button:SetText(text .. ": " .. (SwitchControlsDB and SwitchControlsDB[key] and "On" or "Off"))
+        end
+
+        button:SetScript("OnClick", function()
+            SwitchControlsDB[key] = not SwitchControlsDB[key]
+            Refresh()
+
+            if onChange then
+                onChange(SwitchControlsDB[key])
+            end
+        end)
+
+        button:SetScript("OnShow", Refresh)
+        Refresh()
+    end
+
+    Toggle("hints", "Hint bar", 30)
+    Toggle("invertLook", "Invert camera", 250, function(on)
+        SwitchControls_SetOption("invertLook", on)
+    end)
+
     local close = CreateFrame("Button", nil, help, "UIPanelButtonTemplate")
     close:SetWidth(180)
     close:SetHeight(40)
@@ -368,7 +411,7 @@ do
         help:Hide()
     end)
 
-    help:SetHeight(rows + 80)
+    help:SetHeight(rows + 130)
 end
 
 local function ToggleHelp()
@@ -547,6 +590,10 @@ frame:SetScript("OnEvent", function(self, event, arg1)
 
         if SwitchControlsDB.hints == nil then
             SwitchControlsDB.hints = true
+        end
+
+        if SwitchControls_SetOption then
+            SwitchControls_SetOption("invertLook", SwitchControlsDB.invertLook and true or false)
         end
     elseif event == "PLAYER_ENTERING_WORLD" then
         -- Only the first time: it also fires after every loading screen.

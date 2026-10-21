@@ -9,6 +9,7 @@
 //   SwitchControls_SetMode("play" | "cursor")
 //   docked = SwitchControls_IsDocked()
 //   SwitchControls_Log(text)                              a line in Logs/Console.txt
+//   SwitchControls_SetOption("invertLook", on)            controller options
 
 void SwitchControlsRegisterScriptFunctions();
 void SwitchControlsUnregisterScriptFunctions();

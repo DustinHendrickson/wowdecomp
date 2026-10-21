@@ -37,6 +37,16 @@ int32_t Script_SwitchControls_Log(lua_State* L) {
     return 0;
 }
 
+int32_t Script_SwitchControls_SetOption(lua_State* L) {
+    const char* name = lua_tostring(L, 1);
+
+    if (name) {
+        SwitchSetOption(name, lua_toboolean(L, 2) != 0);
+    }
+
+    return 0;
+}
+
 int32_t Script_SwitchControls_IsDocked(lua_State* L) {
     lua_pushboolean(L, SwitchIsDocked());
     return 1;
@@ -50,6 +60,7 @@ const struct {
     { "SwitchControls_SetMode", &Script_SwitchControls_SetMode },
     { "SwitchControls_IsDocked", &Script_SwitchControls_IsDocked },
     { "SwitchControls_Log", &Script_SwitchControls_Log },
+    { "SwitchControls_SetOption", &Script_SwitchControls_SetOption },
 };
 
 }
