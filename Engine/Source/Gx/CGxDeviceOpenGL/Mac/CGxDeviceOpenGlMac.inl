@@ -198,6 +198,14 @@ void CGxDeviceOpenGl::CursorUnlock(uint32_t x, uint32_t y) {
 }
 #endif
 
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+void CGxDeviceOpenGl::ICursorDraw() {
+    if (!OsMacCursorHidden()) {
+        CGxDevice::ICursorDraw();
+    }
+}
+#endif
+
 void CGxDeviceOpenGl::DeviceSetGamma(float gamma) {
     CGxDevice::DeviceSetGamma(gamma);
 

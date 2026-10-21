@@ -96,7 +96,8 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 | R | Tab (next enemy) | | |
 | ZL, ZR (hold) | Shift, Ctrl, for more bindings | | |
 
-In both modes **L3** (left stick click) is autorun (Num Lock) and **Plus** is Escape (game menu, close windows, clear
+Play mode hides the cursor; cursor mode shows it where you last left it. Touching the screen or moving a USB mouse
+shows it in either mode. In both modes **L3** (left stick click) is autorun (Num Lock) and **Plus** is Escape (game menu, close windows, clear
 target). Shift and Ctrl with the face buttons and D-pad give 24 more bindings; set them in Key Bindings.
 
 **Typing.** When a text box gets the focus (chat, login, mail, ...), the Switch's software keyboard opens. OK puts the

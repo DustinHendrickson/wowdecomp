@@ -27,7 +27,8 @@
 //   L R          8, Tab (target)       Y            Enter (open chat)
 //   ZL ZR (hold) Shift, Ctrl
 //
-//   In both: L3 is autorun (Num Lock), Plus is Escape.
+//   In both: L3 is autorun (Num Lock), Plus is Escape. Play mode hides the cursor (touching the screen or moving a USB
+//   mouse shows it); cursor mode brings it back where it was last left.
 //
 //   While a text box has the keyboard focus, the face buttons and D-pad edit text instead: A is Enter, B Escape, X Tab,
 //   Y opens the software keyboard, and the D-pad gives the arrow keys. Movement keys aren't sent then, so they don't
@@ -85,8 +86,12 @@ bool s_needPoll = true;
 bool s_closeSent;
 uint64_t s_lastPollMs;
 
-// Controller state.
+// Controller state. The cursor shows in cursor mode, or while the touch screen or a USB mouse is in use; play mode
+// hides it. Leaving cursor mode keeps its position for the next time.
 bool s_cursorMode;
+bool s_pointerActive;
+C2iVector s_cursorModePos;
+bool s_cursorModePosSet;
 NxInputState s_previous;
 
 // Debugging aid, as WOWDECOMP_SCREENSHOTS on macOS: "screenshots=20,45" in Debug.txt presses Print Screen that many seconds
@@ -446,6 +451,10 @@ void PollMouse(const NxInputState& state) {
         return;
     }
 
+    if (state.mouseDeltaX || state.mouseDeltaY || state.mouseButtons || state.mouseWheel) {
+        s_pointerActive = true;
+    }
+
     // Deltas in the 1280x720 space libnx reports, scaled to the content.
     int32_t dx = state.mouseDeltaX * s_contentWidth / 1280;
     int32_t dy = state.mouseDeltaY * s_contentHeight / 720;
@@ -488,6 +497,8 @@ void PollTouch(const NxInputState& state, uint64_t now) {
         s_touchState = Touch_None;
         return;
     }
+
+    s_pointerActive = true;
 
     C2iVector point;
     point.x = state.touches[0].x * s_contentWidth / 1280;
@@ -618,6 +629,7 @@ Output Mapping(uint64_t button) {
 
 void RequestKeyboard();
 void EndLook();
+void SetCursorMode(bool cursorMode);
 
 void PressOutput(const Output& output) {
     switch (output.type) {
@@ -631,8 +643,7 @@ void PressOutput(const Output& output) {
             PutWheel(output.value);
             break;
         case Output_ToggleCursor:
-            EndLook();
-            s_cursorMode = !s_cursorMode;
+            SetCursorMode(!s_cursorMode);
             break;
         case Output_Keyboard:
             RequestKeyboard();
@@ -665,6 +676,29 @@ void SetMoveKey(bool& state, KEY key, float amount) {
     if (down != state) {
         state = down;
         PutKey(key, down);
+    }
+}
+
+void SetCursorMode(bool cursorMode) {
+    EndLook();
+
+    if (cursorMode == s_cursorMode) {
+        return;
+    }
+
+    if (cursorMode) {
+        // Back where it was last time, not wherever looking around left it.
+        if (!s_cursorModePosSet) {
+            s_cursorModePos = ScreenCenter();
+            s_cursorModePosSet = true;
+        }
+
+        s_cursorMode = true;
+        MoveMouseTo(s_cursorModePos);
+    } else {
+        s_cursorModePos = s_mousePos;
+        s_cursorMode = false;
+        s_pointerActive = false;
     }
 }
 
@@ -727,6 +761,8 @@ void PollRightStick(const NxStick& stick, float seconds) {
     uint64_t now = OsGetAsyncTimeMs();
 
     if (active) {
+        s_pointerActive = false;
+
         if (!s_looking && !(s_osButtonState & (MOUSE_BUTTON_LEFT | MOUSE_BUTTON_RIGHT))) {
             BeginLook();
         }
@@ -1021,6 +1057,10 @@ void OsMacSetWindowFullscreen(void* window, bool fullscreen, int32_t width, int3
 void OsMacSetWindowListener(void* window, OsMacWindowListener listener, void* param) {
     s_listener = listener;
     s_listenerParam = param;
+}
+
+bool OsMacCursorHidden() {
+    return !s_cursorMode && !s_pointerActive;
 }
 
 void OsMacGetScreenSize(int32_t* width, int32_t* height) {

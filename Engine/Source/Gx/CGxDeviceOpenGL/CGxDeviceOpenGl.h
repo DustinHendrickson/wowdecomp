@@ -142,6 +142,11 @@ class CGxDeviceOpenGl : public CGxDevice {
     void ApplyMacCursor();
 #endif
 
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+    // The Switch hides the game's cursor while a controller is in play mode (Os/Switch/Input.cpp).
+    virtual void ICursorDraw();
+#endif
+
     static LRESULT CALLBACK WindowProcGl(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
     CGxDeviceOpenGl();
