@@ -3,7 +3,9 @@
 //
 // By default it draws a spinning triangle until the window is closed. With --self-test it reads the back buffer back
 // with glReadPixels to check the clear color and the triangle, checks the shader targets the device picked and that
-// it follows a window resize, and exits non-zero on failure.
+// it follows a window resize, and exits non-zero on failure. It also lays out text with an inline texture
+// (|Tpath:height:width|t) through the client's font code and checks that the text after the texture is laid out next
+// to it.
 #import <AppKit/AppKit.h>
 #define GL_SILENCE_DEPRECATION 1
 #import <OpenGL/gl.h>
@@ -14,6 +16,9 @@
 #include "Engine/Source/Gx/CGxFormat.h"
 #include "Engine/Source/Gx/Gx.h"
 #include "Engine/Source/Gxu/Gxu.h"
+#include "Engine/Source/Gxu/GxuFont.h"
+#include "Engine/Source/Gxu/GxuFontMiscClasses.h"
+#include "Engine/Source/Gxu/GxuFontString.h"
 #include "Engine/Source/Os/Gui.h"
 #include "Engine/Source/Os/Input.h"
 #include "Engine/Source/Os/Mac/OsMacWindow.h"
@@ -33,6 +38,121 @@ static void Pixel(int32_t x, int32_t y, uint8_t rgba[4]) {
 
 static bool Near(const uint8_t rgba[4], int r, int g, int b) {
     return std::abs(rgba[0] - r) <= 2 && std::abs(rgba[1] - g) <= 2 && std::abs(rgba[2] - b) <= 2;
+}
+
+struct TextLayout {
+    int32_t quads;
+    float minX;
+    float maxX;
+    uint32_t textures;
+};
+
+// Lays a string out the way a FontString does and measures its glyph quads (x in pixels).
+static TextLayout LayOut(CGxFont* face, const char* text) {
+    TextLayout layout = { 0, 1e9f, -1e9f, 0 };
+    CGxString* string = nullptr;
+    C3Vector position = { 0.0f, 0.0f, 0.0f };
+    CImVector color = { 0xFF, 0xFF, 0xFF, 0xFF };
+
+    if (!GxuFontCreateString(face, text, 0.02f, position, 1.0f, 0.1f, 0.0f, string, GxVJ_Middle, GxHJ_Left, 0, color, 0.0f, 1.0f) || !string) {
+        return layout;
+    }
+
+    string->CreateGeometry();
+
+    for (TEXTLINETEXTURE* line : string->m_textLines) {
+        if (!line) {
+            continue;
+        }
+
+        for (uint32_t i = 0; i < line->m_verts.Count(); i++) {
+            layout.minX = std::fmin(layout.minX, line->m_verts[i].m_vc.x);
+            layout.maxX = std::fmax(layout.maxX, line->m_verts[i].m_vc.x);
+        }
+
+        layout.quads += static_cast<int32_t>(line->m_verts.Count() / 4);
+    }
+
+    const GXUEMBEDDEDTEXTUREINFO* textures = nullptr;
+    layout.textures = string->GetEmbeddedTextureInfo(textures);
+
+    GxuFontDestroyString(string);
+    return layout;
+}
+
+static void FontChecks() {
+    GxuFontInitialize();
+    CGxFont* face = nullptr;
+    CHECK(GxuFontCreateFont("/System/Library/Fonts/Supplemental/Arial.ttf", 0.02f, face, 0) && face);
+
+    if (!face) {
+        return;
+    }
+
+    TextLayout plain = LayOut(face, "Move");
+    TextLayout icon = LayOut(face, "|TInterface\\Icons\\Test:18:18|t Move");
+    TextLayout iconOnly = LayOut(face, "|TInterface\\Icons\\Test:18|t Move");
+    printf("     \"Move\": %d quads, x %.1f..%.1f\n", plain.quads, plain.minX, plain.maxX);
+    printf("     \"|T..:18:18|t Move\": %d quads, x %.1f..%.1f, %u textures\n", icon.quads, icon.minX, icon.maxX, icon.textures);
+    printf("     \"|T..:18|t Move\": %d quads, x %.1f..%.1f, %u textures\n", iconOnly.quads, iconOnly.minX, iconOnly.maxX, iconOnly.textures);
+
+    // " Move" after the texture: the space and four letters, laid out past the texture.
+    CHECK(plain.quads == 4);
+    CHECK(icon.textures == 1 && icon.quads == plain.quads + 1 && icon.minX > plain.minX + 10.0f);
+    CHECK(iconOnly.textures == 1 && iconOnly.quads == plain.quads + 1);
+
+    // Measuring: what FontStrings size themselves by. The text after the texture must count.
+    const char* iconText = "|TInterface\\Icons\\Test:18:18|t Move";
+    float plainExtent = 0.0f;
+    float iconExtent = 0.0f;
+    float textureExtent = 0.0f;
+    GxuFontGetTextExtent(face, "Move", 4, 0.02f, &plainExtent, 0.0f, 1.0f, 0.0f, 0);
+    GxuFontGetTextExtent(face, iconText, static_cast<uint32_t>(strlen(iconText)), 0.02f, &iconExtent, 0.0f, 1.0f, 0.0f, 0);
+    GxuFontGetTextExtent(face, "|TInterface\\Icons\\Test:18:18|t", 30, 0.02f, &textureExtent, 0.0f, 1.0f, 0.0f, 0);
+    printf("     extents: \"Move\" %.4f, texture %.4f, texture + \" Move\" %.4f\n", plainExtent, textureExtent, iconExtent);
+    CHECK(iconExtent > plainExtent + textureExtent * 0.5f);
+
+    // The texture counts as one character.
+    float fitExtent = 0.0f;
+    uint32_t fits = GxuFontGetMaxCharsWithinWidth(face, iconText, 0.02f, iconExtent + 0.001f, static_cast<uint32_t>(strlen(iconText)), &fitExtent, 0.0f, 1.0f, 0.0f, 0);
+    CHECK(fits == 6);
+
+    // What a FontString without a set width does: it measures its text, then checks the text fits that width and cuts it
+    // with "..." where it doesn't (CSimpleFontString::GetDisplayText).
+    const char* hints[] = {
+        "Move",
+        iconText,
+        "|cffffd100Play|r    |TA:18:18|t Move    |TB:18:18|t Look    |TC:18:18|t|TD:18:18|t Actions 1-3",
+    };
+
+    // FontString style flags (0x212 by default, 0x400 without color codes), font heights and layout scales a UI uses.
+    const uint32_t styles[] = { 0, 0x212, 0x612 };
+    const float heights[] = { 0.02f, 0.0156f, 0.0125f };
+    const float scales[] = { 1.0f, 0.9f, 0.64f };
+    int32_t cut = 0;
+
+    for (const char* hint : hints) {
+        for (uint32_t style : styles) {
+            for (float fontHeight : heights) {
+                for (float scale : scales) {
+                    uint32_t bytes = static_cast<uint32_t>(strlen(hint));
+                    float width = 0.0f;
+                    GxuFontGetTextExtent(face, hint, bytes, fontHeight * scale, &width, 0.0f, scale, 0.0f, style);
+                    uint32_t fit = GxuFontGetMaxCharsWithinWidthAndHeight(face, hint, fontHeight * scale, width, fontHeight * scale * 1.5f, bytes, 0.0f, scale, 0.0f, style);
+
+                    if (fit != bytes) {
+                        printf("     cut: style %x height %.4f scale %.2f \"%s\": width %.4f, %u of %u bytes fit\n", style, fontHeight, scale, hint, width, fit, bytes);
+                        cut++;
+                    }
+                }
+            }
+        }
+    }
+
+    printf("     %d of %d measured strings cut\n", cut, static_cast<int32_t>(sizeof(hints) / sizeof(hints[0]) * 27));
+    CHECK(cut == 0);
+
+    GxuFontDestroyFont(face);
 }
 
 static void DrawFrame(float time, bool solid) {
@@ -189,6 +309,8 @@ int main(int argc, char** argv) {
     Pixel(static_cast<int32_t>(400 * scale), static_cast<int32_t>(300 * scale), center);
     CHECK(Near(center, 0xFF, 0xFF, 0x00));
     GxScenePresent();
+
+    FontChecks();
 
     GxDevDestroy(device);
 
