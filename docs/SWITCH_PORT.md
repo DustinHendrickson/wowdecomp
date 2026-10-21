@@ -101,12 +101,18 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 | L (tap) | action key 8 | Y | Enter (opens chat) |
 | L (hold) + right stick up / down | zoom the camera | | |
 | R | Tab (next enemy) | X | the controls list |
+| ZR (hold) + R | Ctrl+Tab (nearest friend) | | |
+| Right stick click | interact: loot the nearest body, talk to an NPC, use an object | Right stick click | back to play mode |
 | ZL, ZR (hold) | Shift, Ctrl, for more bindings | | |
 
 Play mode hides the cursor; cursor mode shows it where you last left it. Touching the screen or moving a USB mouse
 shows it in either mode. In both modes **L3** (left stick click) is autorun (Num Lock) and **Plus** is Escape (game
 menu, close windows, clear target). Shift and Ctrl with the face buttons and D-pad give 24 more bindings; set them in
 Key Bindings.
+
+Interact (right stick click) picks the nearest lootable or skinnable body, friendly NPC with something to offer, or
+usable object (chests, herbs, ore, mailboxes) in reach, preferring what is in front of the character, targets it and
+right-clicks it, as clicking it with the mouse would. With nothing in reach it says so in red at the top of the screen.
 
 **On screen** (the built-in SwitchControls add-on, packed in `WoW.nro` and installed into `Interface/AddOns` at every
 start, so it always matches the build):

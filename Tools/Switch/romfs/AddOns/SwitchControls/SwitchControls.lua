@@ -168,6 +168,7 @@ local HINTS = {
         { "L", "RStick", "Zoom" },
         { "B", "Jump" },
         { "R", "Target" },
+        { "RStickClick", "Interact" },
         { "Minus", "Cursor" },
     },
     cursor = {
@@ -287,6 +288,8 @@ local HELP_COLUMNS = {
         { "L", "Tap: action button 8" },
         { "L", "RStick", "Hold L: zoom camera" },
         { "R", "Target nearest enemy" },
+        { "ZR", "R", "Target nearest friend" },
+        { "RStickClick", "Interact: loot, talk, use" },
         { "ZL", "ZR", "Hold: Shift / Ctrl bindings" },
         { "LStickClick", "Autorun" },
     },
@@ -421,6 +424,15 @@ local function ToggleHelp()
         help:Show()
     end
 end
+
+-- Clicking the right stick in play mode sends F17 (Os/Switch/Input.cpp), which clicks this button: the nearest lootable
+-- body, NPC or usable object, as a right-click on it would.
+local interact = CreateFrame("Button", "SwitchControlsInteract", UIParent)
+interact:SetScript("OnClick", function()
+    if not SwitchControls_Interact() then
+        UIErrorsFrame:AddMessage("Nothing nearby to interact with", 1.0, 0.1, 0.1, 1.0)
+    end
+end)
 
 -- Holding Minus, and X in cursor mode, send F19 (Os/Switch/Input.cpp), which clicks this button.
 local helpToggle = CreateFrame("Button", "SwitchControlsHelpToggle", UIParent)
@@ -600,6 +612,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         if not entered then
             entered = true
             SetOverrideBindingClick(frame, false, "F19", "SwitchControlsHelpToggle")
+            SetOverrideBindingClick(frame, false, "F17", "SwitchControlsInteract")
 
             if not NeedsCursor() then
                 SwitchControls_SetMode("play")

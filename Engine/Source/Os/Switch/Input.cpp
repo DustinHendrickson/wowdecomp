@@ -16,7 +16,7 @@
 // - A USB keyboard and mouse work as they do on a computer.
 // - The touch screen is the mouse: a tap is a left click, a drag a left drag, and a touch held still for half a second
 //   a right click.
-// - A controller (handheld, Joy-Cons or Pro Controller) has two modes, switched with Minus or a right stick click.
+// - A controller (handheld, Joy-Cons or Pro Controller) has two modes, switched with Minus.
 //   Holding Minus opens the SwitchControls add-on's controls list instead:
 //
 //   Play mode (in the world)           Cursor mode (login screens, and while windows are open)
@@ -28,6 +28,10 @@
 //   L R          8, Tab (target)       Y            Enter (open chat)
 //   L (hold) + right stick up / down: zoom the camera (the mouse wheel); L alone is 8, sent on release
 //   ZL ZR (hold) Shift, Ctrl           X            F19 (the SwitchControls add-on's controls list)
+//
+//   Clicking the right stick interacts in play mode (F17: the SwitchControls add-on right-clicks the nearest lootable
+//   body, NPC or usable object) and goes back to play mode from the cursor. ZR (Ctrl) + R (Tab) targets the nearest
+//   friend, the default Ctrl+Tab binding.
 //
 //   In both: L3 is autorun (Num Lock), Plus is Escape. Play mode hides the cursor (touching the screen or moving a USB
 //   mouse shows it); cursor mode brings it back where it was last left.
@@ -574,7 +578,13 @@ Output Mapping(uint64_t button) {
             output.type = Output_MinusHold;
             return output;
         case NxButton_StickR:
-            output.type = Output_ToggleCursor;
+            // Interact in play mode (F17, which the SwitchControls add-on binds); back to play mode from the cursor.
+            if (!s_cursorMode && !TextMode()) {
+                key(KEY_F17);
+            } else {
+                output.type = Output_ToggleCursor;
+            }
+
             return output;
         case NxButton_Plus:
             key(KEY_ESCAPE);

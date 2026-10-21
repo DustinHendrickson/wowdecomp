@@ -10,6 +10,7 @@
 //   docked = SwitchControls_IsDocked()
 //   SwitchControls_Log(text)                              a line in Logs/Console.txt
 //   SwitchControls_SetOption("invertLook", on)            controller options
+//   interacted = SwitchControls_Interact()                right-click the nearest lootable body, NPC or usable object
 
 void SwitchControlsRegisterScriptFunctions();
 void SwitchControlsUnregisterScriptFunctions();
