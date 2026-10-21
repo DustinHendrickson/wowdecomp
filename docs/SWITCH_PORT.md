@@ -146,8 +146,9 @@ by itself; OK, then **A** (Enter) logs in.
 2. **Memory**: about 3.2 GB over a game. WoW 3.3.5a typically uses 1 to 1.5 GB, plus the GL driver's copies of textures.
    `OsAllocNear` (M2 data) needs allocations within 1.5 GB of their model; with a 3 GB heap that can fail late in a
    session and is reported as a failed load.
-3. **pread / pwrite** are seek-read-seek under one lock. If MPQ reads from the loader threads turn out slow, read each
-   file through its own descriptor.
+3. **pread / pwrite** are seek-read-seek. Every read, write and lseek takes its descriptor's lock (linker `--wrap`,
+   `Os/Switch/Posix.cpp`), so they can't interleave with another thread's reads. If MPQ reads turn out slow, read
+   each file through its own descriptor.
 4. **Controller mapping** is fixed. A small `WTF/Controller.txt` with per-button keys would let players change it.
 5. Docked 1080p, CPU boost during loading (the system's "fast load" boost lowers the GPU clock, so it isn't used yet),
    and suspend / resume (the GL surface and audio after sleep) need checking on hardware.

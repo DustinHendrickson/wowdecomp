@@ -55,7 +55,9 @@ set(CMAKE_CXX_FLAGS_INIT
 
 # GCC links: libnx's specs file brings crt0, the linker script and the PIE settings that elf2nro expects. The game
 # libraries depend on each other in every direction (ld64 on macOS doesn't mind), so they link as one group.
-set(NX_LINK_FLAGS "-specs=${NX_ROOT}/switch.specs -march=armv8-a+crc+crypto -mtune=cortex-a57 -fPIE -L${NX_PORTLIBS}/lib -L${NX_ROOT}/lib")
+# read / write / lseek / abort are wrapped by Engine/Source/Os/Switch/Posix.cpp: descriptor locks for its pread, and a
+# report when the process aborts.
+set(NX_LINK_FLAGS "-specs=${NX_ROOT}/switch.specs -march=armv8-a+crc+crypto -mtune=cortex-a57 -fPIE -L${NX_PORTLIBS}/lib -L${NX_ROOT}/lib -Wl,--wrap=read,--wrap=write,--wrap=lseek,--wrap=abort")
 set(CMAKE_C_LINK_EXECUTABLE "${NX_GXX} ${NX_LINK_FLAGS} <LINK_FLAGS> <OBJECTS> -o <TARGET> -Wl,--start-group <LINK_LIBRARIES> -Wl,--end-group -lnx -lm")
 set(CMAKE_CXX_LINK_EXECUTABLE "${CMAKE_C_LINK_EXECUTABLE}")
 
