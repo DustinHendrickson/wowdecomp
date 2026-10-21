@@ -11,9 +11,64 @@
 #include "Engine/Source/BlizzardCore/Source/System/String/String.h"
 #include "Engine/Source/Os/OsFile.h"
 
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+#include <mutex>
+#include <string>
+#include <unordered_map>
+
+// On the Switch each write is a request to the SD card's file system, slow for the small pieces some files are written in
+// (saved variables: a key, " = ", a value, ...), thousands of them per file. Writes are gathered per file here and go
+// out in large pieces: when enough has built up, before any other use of the file, and on closing it.
+namespace {
+
+const size_t kWriteBufferLimit = 256 * 1024;
+
+std::mutex s_writeLock;
+std::unordered_map<HOSFILE, std::string> s_writeBuffers;
+
+bool FlushWrites(HOSFILE file) {
+    std::string pending;
+
+    {
+        std::lock_guard<std::mutex> lock(s_writeLock);
+        auto entry = s_writeBuffers.find(file);
+
+        if (entry == s_writeBuffers.end()) {
+            return true;
+        }
+
+        pending.swap(entry->second);
+        s_writeBuffers.erase(entry);
+    }
+
+    const char* data = pending.data();
+    size_t left = pending.size();
+
+    while (left) {
+        int32_t count = static_cast<int32_t>(left);
+
+        if (!Blizzard::File::Write(reinterpret_cast<Blizzard::File::StreamRecord*>(file), const_cast<char*>(data), &count) || count <= 0) {
+            return false;
+        }
+
+        data += count;
+        left -= static_cast<size_t>(count);
+    }
+
+    return true;
+}
+
+}
+#endif
+
 // OFFSET: 0x00461B00
 bool OsCloseFile(HOSFILE file) {
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+    bool flushed = FlushWrites(file);
+    return Blizzard::File::Close(reinterpret_cast<Blizzard::File::StreamRecord*>(file)) && flushed;
+#else
     return Blizzard::File::Close(reinterpret_cast<Blizzard::File::StreamRecord*>(file));
+#endif
 }
 
 // OFFSET: 0x00461B10
@@ -28,6 +83,10 @@ int32_t OsDirectoryExists(const char* pathName) {
 
 // OFFSET: 0x00461B50
 int32_t OsReadFile(HOSFILE file, void* buffer, uint32_t bytesToRead, uint32_t* bytesRead) {
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+    FlushWrites(file);
+#endif
+
     if (buffer && bytesRead) {
         *bytesRead = bytesToRead;
         return Blizzard::File::Read(reinterpret_cast<Blizzard::File::StreamRecord*>(file), buffer, reinterpret_cast<int32_t*>(bytesRead));
@@ -39,6 +98,22 @@ int32_t OsReadFile(HOSFILE file, void* buffer, uint32_t bytesToRead, uint32_t* b
 
 // OFFSET: 0x00461B90
 int32_t OsWriteFile(HOSFILE file, const void* buffer, uint32_t bytesToWrite, uint32_t* bytesWritten) {
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+    if (buffer && bytesWritten && file && file != OS_INVALID_FILE) {
+        size_t buffered;
+
+        {
+            std::lock_guard<std::mutex> lock(s_writeLock);
+            std::string& pending = s_writeBuffers[file];
+            pending.append(static_cast<const char*>(buffer), bytesToWrite);
+            buffered = pending.size();
+        }
+
+        *bytesWritten = bytesToWrite;
+        return buffered < kWriteBufferLimit || FlushWrites(file);
+    }
+#endif
+
     if (buffer && bytesWritten) {
         *bytesWritten = bytesToWrite;
         return Blizzard::File::Write(reinterpret_cast<Blizzard::File::StreamRecord*>(file), buffer, reinterpret_cast<int32_t*>(bytesWritten));
@@ -50,6 +125,10 @@ int32_t OsWriteFile(HOSFILE file, const void* buffer, uint32_t bytesToWrite, uin
 
 // OFFSET: 0x00461BD0
 uint64_t OsGetFileSize(HOSFILE file) {
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+    FlushWrites(file);
+#endif
+
     Blizzard::File::FileInfo* info = Blizzard::File::GetFileInfo(reinterpret_cast<Blizzard::File::StreamRecord*>(file));
     return info ? info->m_size : 0xFFFFFFFF;
 }

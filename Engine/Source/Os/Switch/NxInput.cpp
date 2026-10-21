@@ -43,7 +43,7 @@ void NxInputInitialize() {
 // NxInputInitialize), so it logs out and saves the UI's saved variables and settings as Exit Game does. Should quitting
 // hang, the exit is unlocked after a while and the system ends the process after all.
 void ExitWatchdog(void* argument) {
-    svcSleepThread(15000000000ULL);
+    svcSleepThread(30000000000ULL);
     appletUnlockExit();
 }
 
