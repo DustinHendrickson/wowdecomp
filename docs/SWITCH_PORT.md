@@ -85,10 +85,12 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 
 - **USB keyboard and mouse** (docked) work as on a computer.
 - **Touch screen**: tap to left-click, drag to left-drag, touch and hold for half a second to right-click.
-- **Controller** (handheld, Joy-Cons, Pro Controller), in two modes. **Minus** or clicking the **right stick** switches
-  between them:
+- **Controller** (handheld, Joy-Cons, Pro Controller), in two modes. **Minus** or clicking the **right stick**
+  switches between them. The login and character screens start in cursor mode; entering the world switches to play
+  mode, and opening a menu or window (game menu, bags, character, spellbook, loot, popups, ...) switches to cursor mode
+  until it closes. Going back to play mode with a window open keeps play mode until the windows close.
 
-| Play mode (default) | | Cursor mode | |
+| Play mode | | Cursor mode | |
 |---|---|---|---|
 | Left stick | move (W / S forward and back, Q / E strafe) | Left stick | move |
 | Right stick | look (turns the camera and character, as right-drag) | Right stick | move the cursor |
@@ -96,12 +98,25 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 | A, X, Y | action keys 1, 2, 3 | B or ZL | right click |
 | D-pad right, up, left, down | action keys 4, 5, 6, 7 | D-pad up / down | mouse wheel |
 | L | action key 8 | Y | Enter (opens chat) |
-| R | Tab (next enemy) | | |
+| R | Tab (next enemy) | X | the controls list |
 | ZL, ZR (hold) | Shift, Ctrl, for more bindings | | |
 
 Play mode hides the cursor; cursor mode shows it where you last left it. Touching the screen or moving a USB mouse
-shows it in either mode. In both modes **L3** (left stick click) is autorun (Num Lock) and **Plus** is Escape (game menu, close windows, clear
-target). Shift and Ctrl with the face buttons and D-pad give 24 more bindings; set them in Key Bindings.
+shows it in either mode. In both modes **L3** (left stick click) is autorun (Num Lock) and **Plus** is Escape (game
+menu, close windows, clear target). Shift and Ctrl with the face buttons and D-pad give 24 more bindings; set them in
+Key Bindings.
+
+**On screen** (the built-in SwitchControls add-on, packed in `WoW.nro` and installed into `Interface/AddOns` at every
+start, so it always matches the build):
+
+- A hint bar at the top of the screen shows what the buttons do right now: play mode, cursor mode, or typing.
+- Action buttons are labeled with the controller buttons that press them (A, ZL+X, D-pad, ...) instead of key names.
+  Keys no controller button sends keep their usual labels.
+- A controls list opens the first time you enter the world; **X** in cursor mode or `/switch` opens it again.
+  `/switch hints` turns the hint bar off and on.
+
+The add-on's sources are `Tools/Switch/romfs/AddOns/SwitchControls`; `Tools/Switch/make_glyphs.py` draws its button
+icons. Its button layout must match `Engine/Source/Os/Switch/Input.cpp`.
 
 **Typing.** When a text box gets the focus (chat, login, mail, ...), the Switch's software keyboard opens. OK puts the
 text in the box; the box's existing text is the keyboard's starting text. While a text box has the focus, the face

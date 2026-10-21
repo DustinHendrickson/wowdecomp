@@ -18,14 +18,14 @@
 //   a right click.
 // - A controller (handheld, Joy-Cons or Pro Controller) has two modes, switched with Minus or a right stick click:
 //
-//   Play mode (the default)            Cursor mode
+//   Play mode (in the world)           Cursor mode (login screens, and while windows are open)
 //   Left stick   move (W S, Q E)       Left stick   move
 //   Right stick  look (right-drag)     Right stick  move the cursor
 //   B            jump (Space)          A / ZR       left click (hold to drag)
 //   A X Y        1 2 3                 B / ZL       right click
 //   D-pad        4 5 6 7 (> ^ < v)     D-pad ^ v    mouse wheel
 //   L R          8, Tab (target)       Y            Enter (open chat)
-//   ZL ZR (hold) Shift, Ctrl
+//   ZL ZR (hold) Shift, Ctrl           X            F19 (the SwitchControls add-on's controls list)
 //
 //   In both: L3 is autorun (Num Lock), Plus is Escape. Play mode hides the cursor (touching the screen or moving a USB
 //   mouse shows it); cursor mode brings it back where it was last left.
@@ -87,8 +87,10 @@ bool s_closeSent;
 uint64_t s_lastPollMs;
 
 // Controller state. The cursor shows in cursor mode, or while the touch screen or a USB mouse is in use; play mode
-// hides it. Leaving cursor mode keeps its position for the next time.
-bool s_cursorMode;
+// hides it. Leaving cursor mode keeps its position for the next time. The game starts in cursor mode for the login and
+// character screens; in the world the SwitchControls add-on switches to play mode, and back to cursor mode while menus
+// and windows are open.
+bool s_cursorMode = true;
 bool s_pointerActive;
 C2iVector s_cursorModePos;
 bool s_cursorModePosSet;
@@ -596,6 +598,10 @@ Output Mapping(uint64_t button) {
                 return output;
             case NxButton_Y:
                 key(KEY_ENTER);
+                return output;
+            case NxButton_X:
+                // The SwitchControls add-on binds F19 to its controls list.
+                key(KEY_F19);
                 return output;
             case NxButton_Up:
                 output.type = Output_Wheel;
@@ -1301,6 +1307,22 @@ const char* SwitchDebugSetting(const char* name) {
 
 void SwitchShowMessage(const char* title, const char* message) {
     NxInputShowMessage(title, message);
+}
+
+SwitchControllerState SwitchGetControllerState() {
+    SwitchControllerState state;
+    state.cursorMode = s_cursorMode;
+    state.textFocus = TextMode();
+    state.pointerActive = s_pointerActive;
+    return state;
+}
+
+void SwitchSetCursorMode(bool cursorMode) {
+    SetCursorMode(cursorMode);
+}
+
+bool SwitchIsDocked() {
+    return NxInputIsDocked();
 }
 
 int32_t SwitchIsModifierDown(int32_t modifier) {

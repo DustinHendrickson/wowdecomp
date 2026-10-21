@@ -160,6 +160,76 @@ bool NxMainHasGameData(const char* folder) {
     return found;
 }
 
+namespace {
+
+bool CopyFile(const char* from, const char* to) {
+    FILE* source = fopen(from, "rb");
+
+    if (!source) {
+        return false;
+    }
+
+    FILE* destination = fopen(to, "wb");
+
+    if (!destination) {
+        fclose(source);
+        return false;
+    }
+
+    char buffer[0x4000];
+    size_t count;
+
+    while ((count = fread(buffer, 1, sizeof(buffer), source)) > 0) {
+        fwrite(buffer, 1, count, destination);
+    }
+
+    fclose(source);
+    fclose(destination);
+    return true;
+}
+
+void CopyTree(const char* from, const char* to) {
+    DIR* directory = opendir(from);
+
+    if (!directory) {
+        return;
+    }
+
+    mkdir(to, 0777);
+
+    while (dirent* entry = readdir(directory)) {
+        if (entry->d_name[0] == '.') {
+            continue;
+        }
+
+        char source[1024];
+        char destination[1024];
+        snprintf(source, sizeof(source), "%s/%s", from, entry->d_name);
+        snprintf(destination, sizeof(destination), "%s/%s", to, entry->d_name);
+
+        if (entry->d_type == DT_DIR) {
+            CopyTree(source, destination);
+        } else if (!CopyFile(source, destination)) {
+            fprintf(stderr, "Couldn't install %s\n", destination);
+        }
+    }
+
+    closedir(directory);
+}
+
+}
+
+void NxMainInstallAddOns() {
+    if (R_FAILED(romfsInit())) {
+        fprintf(stderr, "No RomFS: built-in add-ons not installed\n");
+        return;
+    }
+
+    mkdir("Interface", 0777);
+    CopyTree("romfs:/AddOns", "Interface/AddOns");
+    romfsExit();
+}
+
 void NxMainShowError(const char* message) {
     ErrorApplicationConfig config;
 

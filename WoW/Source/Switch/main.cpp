@@ -106,6 +106,7 @@ int main() {
     chdir(folder);
     NxMainRedirectConsole();
     PrepareConfig();
+    NxMainInstallAddOns();
 
     pthread_attr_t attributes;
     pthread_attr_init(&attributes);

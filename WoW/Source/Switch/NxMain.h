@@ -25,4 +25,8 @@ bool NxMainHasGameData(const char* folder);
 
 void NxMainShowError(const char* message);
 
+// Copies the add-ons packed in the NRO (Tools/Switch/romfs/AddOns) into Interface/AddOns in the game folder (the
+// working directory), replacing older copies, so they always match the build.
+void NxMainInstallAddOns();
+
 #endif

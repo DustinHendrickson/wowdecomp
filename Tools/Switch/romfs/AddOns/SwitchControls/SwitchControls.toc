@@ -1,0 +1,7 @@
+## Interface: 30300
+## Title: Switch Controls
+## Notes: Controller button hints, labels on action buttons, and the cursor while menus are open, for the Nintendo Switch.
+## Author: wowdecomp
+## Version: 1.0
+## SavedVariables: SwitchControlsDB
+SwitchControls.lua

@@ -18,6 +18,17 @@ void SwitchShowMessage(const char* title, const char* message);
 //   screenshots=15,25   press Print Screen that many seconds after the first input poll (WOWDECOMP_SCREENSHOTS)
 const char* SwitchDebugSetting(const char* name);
 
+// The controller mode and what the cursor shows for, for the SwitchControls add-on (WoW/Source/Ui/Switch).
+struct SwitchControllerState {
+    bool cursorMode;
+    bool textFocus;
+    bool pointerActive;
+};
+
+SwitchControllerState SwitchGetControllerState();
+void SwitchSetCursorMode(bool cursorMode);
+bool SwitchIsDocked();
+
 // 0 Control, 1 Shift, 2 Alt, as OsGuiIsModifierKeyDown takes them.
 int32_t SwitchIsModifierDown(int32_t modifier);
 

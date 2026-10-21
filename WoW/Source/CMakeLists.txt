@@ -95,6 +95,10 @@ if (WOWDECOMP_PLATFORM_SWITCH)
     set(WOW_NRO ${WOWDECOMP_BIN_DIR}/WoW.nro)
     set(WOW_ICON ${CMAKE_SOURCE_DIR}/Tools/Switch/icon.jpg)
 
+    # Files packed into the NRO's RomFS: the SwitchControls add-on, installed into Interface/AddOns at start.
+    set(WOW_ROMFS ${CMAKE_SOURCE_DIR}/Tools/Switch/romfs)
+    file(GLOB_RECURSE WOW_ROMFS_FILES CONFIGURE_DEPENDS ${WOW_ROMFS}/*)
+
     add_custom_command(
         OUTPUT ${WOW_NACP}
         COMMAND ${NX_TOOLS}/nacptool --create "World of Warcraft" "wowdecomp" "3.3.5.12340" ${WOW_NACP}
@@ -103,8 +107,8 @@ if (WOWDECOMP_PLATFORM_SWITCH)
 
     add_custom_command(
         OUTPUT ${WOW_NRO}
-        COMMAND ${NX_TOOLS}/elf2nro $<TARGET_FILE:Wow> ${WOW_NRO} --nacp=${WOW_NACP} --icon=${WOW_ICON}
-        DEPENDS Wow ${WOW_NACP} ${WOW_ICON}
+        COMMAND ${NX_TOOLS}/elf2nro $<TARGET_FILE:Wow> ${WOW_NRO} --nacp=${WOW_NACP} --icon=${WOW_ICON} --romfsdir=${WOW_ROMFS}
+        DEPENDS Wow ${WOW_NACP} ${WOW_ICON} ${WOW_ROMFS_FILES}
         COMMENT "Packaging WoW.nro"
         VERBATIM
     )

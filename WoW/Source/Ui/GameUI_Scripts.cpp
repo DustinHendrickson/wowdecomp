@@ -166,6 +166,9 @@
 #include "Engine/Source/Tempest/CMath.h"
 #include "WoW/Source/DB/Rec/PaperDollItemFrameRec.h"
 #include "WoW/Source/Object/WGUID.h"
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+#include "WoW/Source/Ui/Switch/SwitchControlsScript.h"
+#endif
 
 // STATIC: 0x00BD0CC4
 static CWOWClientStatus* s_loadAddOnStatus;
@@ -6565,6 +6568,9 @@ void LoadScriptFunctions() {
     EquipmentManagerRegisterScriptFunctions();
     GMTicketInfoRegisterScriptFunctions();
     BattlenetUI_RegisterScriptFunctions();
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+    SwitchControlsRegisterScriptFunctions();
+#endif
 }
 
 // VERIFY: ce499890 manual
@@ -6647,4 +6653,7 @@ void UnloadScriptFunctions() {
     EquipmentManagerUnregisterScriptFunctions();
     GMTicketInfoUnregisterScriptFunctions();
     BattlenetUI_UnregisterScriptFunctions();
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+    SwitchControlsUnregisterScriptFunctions();
+#endif
 }
