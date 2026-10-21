@@ -113,6 +113,12 @@ Key Bindings.
 Interact (right stick click) picks the nearest lootable or skinnable body, friendly NPC with something to offer, or
 usable object (chests, herbs, ore, mailboxes) in reach, preferring what is in front of the character, targets it and
 right-clicks it, as clicking it with the mouse would. With nothing in reach it says so in red at the top of the screen.
+It is an ordinary key binding ("Interact" under Switch Controls in Key Bindings), so it can be moved to another button.
+
+**Key Bindings** (game menu) works with the controller: pick a row (tap it, or point and press A), then press the
+button to bind; hold ZL (Shift), ZR (Ctrl) or both for more. While a row waits, every button sends its play mode key
+(A X Y 1 2 3, the D-pad 4 to 7, L 8, R Tab, B Space, L3 Num Lock, R3 F17), the left stick sends nothing, and Plus cancels
+rather than binding Escape. The list shows bindings as Switch buttons.
 
 **On screen** (the built-in SwitchControls add-on, packed in `WoW.nro` and installed into `Interface/AddOns` at every
 start, so it always matches the build):
@@ -122,7 +128,8 @@ start, so it always matches the build):
 - Action buttons are labeled with the controller buttons that press them (A, ZL+X, D-pad, ...) instead of key names.
   Keys no controller button sends keep their usual labels.
 - The controls list has two options: **Hint bar** on / off, and **Invert camera** (the right stick's up and down; the
-  game's own mouse invert doesn't reach the stick).
+  game's own mouse invert doesn't reach the stick). Both are saved in `Registry.txt` the moment they change, so they
+  survive closing the game from the HOME menu (the add-on's saved variables are written only on a clean logout).
 - A controls list opens the first time you enter the world. Hold **Minus**, tap the hint bar, or press **X** in cursor
   mode to open it again; the same, **Plus**, or its Close button closes it. (`/switch hints` turns the hint bar off and
   on, for a USB keyboard.)

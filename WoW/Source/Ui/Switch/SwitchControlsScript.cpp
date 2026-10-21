@@ -142,6 +142,24 @@ int32_t Script_SwitchControls_SetOption(lua_State* L) {
     return 0;
 }
 
+int32_t Script_SwitchControls_GetOption(lua_State* L) {
+    const char* name = lua_tostring(L, 1);
+    bool value;
+
+    if (!name || !SwitchGetOption(name, &value)) {
+        lua_pushnil(L);
+    } else {
+        lua_pushboolean(L, value);
+    }
+
+    return 1;
+}
+
+int32_t Script_SwitchControls_SetKeyCapture(lua_State* L) {
+    SwitchSetKeyCapture(lua_toboolean(L, 1) != 0);
+    return 0;
+}
+
 // interacted = SwitchControls_Interact(): what the controller's interact button does. The add-on's button calls it from a
 // key binding; the game's own InteractUnit refuses add-on code, so this runs the right-click as if from the game.
 int32_t Script_SwitchControls_Interact(lua_State* L) {
@@ -192,7 +210,9 @@ const struct {
     { "SwitchControls_SetMode", &Script_SwitchControls_SetMode },
     { "SwitchControls_IsDocked", &Script_SwitchControls_IsDocked },
     { "SwitchControls_Log", &Script_SwitchControls_Log },
+    { "SwitchControls_GetOption", &Script_SwitchControls_GetOption },
     { "SwitchControls_SetOption", &Script_SwitchControls_SetOption },
+    { "SwitchControls_SetKeyCapture", &Script_SwitchControls_SetKeyCapture },
     { "SwitchControls_Interact", &Script_SwitchControls_Interact },
 };
 

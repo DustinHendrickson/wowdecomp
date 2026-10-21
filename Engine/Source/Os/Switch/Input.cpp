@@ -33,6 +33,9 @@
 //   usable object). ZR (Ctrl) + R (Tab) targets the nearest
 //   friend, the default Ctrl+Tab binding.
 //
+//   While a row of the Key Bindings window waits for a key, the buttons send their play mode keys even in cursor mode
+//   and the left stick sends nothing, so any button, with ZL / ZR held for Shift / Ctrl, can be bound.
+//
 //   In both: L3 is autorun (Num Lock), Plus is Escape. Play mode hides the cursor (touching the screen or moving a USB
 //   mouse shows it); cursor mode brings it back where it was last left.
 //
@@ -166,6 +169,15 @@ float s_zoomRemainder;
 // Up on the right stick looks down when set (the SwitchControls add-on's "Invert camera"). The controller's own
 // setting: the game's mouseInvertPitch doesn't reach the stick.
 bool s_invertLook;
+
+// Controller options live in Registry.txt, written the moment they change. The add-on's saved variables are written only
+// on a clean logout or quit, which closing the game from the HOME menu skips.
+const char kOptionsKey[] = "World of Warcraft\\Switch";
+bool s_optionsLoaded;
+
+// A row of the Key Bindings window is waiting for a key: the buttons send their play mode keys even in cursor mode, so
+// any of them (with ZL / ZR for Shift / Ctrl) can be bound, and the left stick sends nothing.
+bool s_keyCapture;
 
 // Minus: a short press switches modes, a long one opens the controls list.
 const uint32_t kMinusHoldMs = 500;
@@ -614,7 +626,7 @@ Output Mapping(uint64_t button) {
         }
     }
 
-    if (s_cursorMode) {
+    if (s_cursorMode && !s_keyCapture) {
         switch (button) {
             case NxButton_A:
             case NxButton_ZR:
@@ -739,7 +751,7 @@ void PollMinusHold() {
 void SetMoveKey(bool& state, KEY key, float amount) {
     bool down = state ? amount > kMoveRelease : amount > kMovePress;
 
-    if (TextMode()) {
+    if (TextMode() || s_keyCapture) {
         down = false;
     }
 
@@ -1019,6 +1031,12 @@ void PollKeyboardRequest() {
 
 void Poll() {
     wowdecomp_switch_perf_frame();
+
+    if (!s_optionsLoaded) {
+        s_optionsLoaded = true;
+        SwitchGetOption("invertLook", &s_invertLook);
+    }
+
     uint64_t now = OsGetAsyncTimeMs();
     float seconds = s_lastPollMs ? static_cast<float>(now - s_lastPollMs) / 1000.0f : 0.0f;
     s_lastPollMs = now;
@@ -1423,10 +1441,35 @@ void SwitchSetCursorMode(bool cursorMode) {
     SetCursorMode(cursorMode);
 }
 
+bool SwitchGetOption(const char* name, bool* value) {
+    uint32_t stored;
+
+    if (!SRegLoadValue(kOptionsKey, name, 0, &stored)) {
+        return false;
+    }
+
+    *value = stored != 0;
+    return true;
+}
+
 void SwitchSetOption(const char* name, bool value) {
     if (!strcmp(name, "invertLook")) {
         s_invertLook = value;
     }
+
+    bool stored;
+
+    if (!SwitchGetOption(name, &stored) || stored != value) {
+        SRegSaveValue(kOptionsKey, name, 0, value ? 1 : 0);
+    }
+}
+
+void SwitchSetKeyCapture(bool capture) {
+    if (capture && !s_keyCapture) {
+        EndLook();
+    }
+
+    s_keyCapture = capture;
 }
 
 bool SwitchIsDocked() {

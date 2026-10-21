@@ -1,0 +1,5 @@
+<Bindings>
+	<Binding name="SWITCHCONTROLS_INTERACT" header="SWITCHCONTROLS">
+		SwitchControlsInteract:Click()
+	</Binding>
+</Bindings>

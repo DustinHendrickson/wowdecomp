@@ -29,8 +29,13 @@ SwitchControllerState SwitchGetControllerState();
 void SwitchSetCursorMode(bool cursorMode);
 bool SwitchIsDocked();
 
-// Controller options from the SwitchControls add-on: "invertLook" (the right stick's up and down in play mode).
+// Controller options from the SwitchControls add-on, kept in Registry.txt: "invertLook" (the right stick's up and down
+// in play mode), and the add-on's own ("hints"). SwitchGetOption is false for an option never set.
+bool SwitchGetOption(const char* name, bool* value);
 void SwitchSetOption(const char* name, bool value);
+
+// The Key Bindings window is waiting for a key: controller buttons send keys rather than clicks.
+void SwitchSetKeyCapture(bool capture);
 
 // 0 Control, 1 Shift, 2 Alt, as OsGuiIsModifierKeyDown takes them.
 int32_t SwitchIsModifierDown(int32_t modifier);

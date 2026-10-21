@@ -29,6 +29,7 @@ local KEY_GLYPHS = {
     ["SPACE"] = "B",
     ["ESCAPE"] = "Plus",
     ["NUMLOCK"] = "LStickClick",
+    ["F17"] = "RStickClick",
 }
 
 -- Held ZL is Shift and held ZR is Ctrl.
@@ -178,6 +179,13 @@ local HINTS = {
         { "B", "Right-click" },
         { "Y", "Chat" },
         { "Minus", "Play" },
+    },
+    bind = {
+        title = "KEY BINDING",
+        { "A", "Any button to bind it" },
+        { "ZL", "Shift" },
+        { "ZR", "Ctrl" },
+        { "Plus", "Cancel" },
     },
     text = {
         title = "TYPING",
@@ -377,7 +385,7 @@ do
     Sequence(help, { "Hold", { "Minus" }, "or press", { "Plus" }, "to close" }, HELP_ICON - 4, "hint", closeAnchor, 0)
 
     -- Options, big enough to tap.
-    local function Toggle(key, text, x, onChange)
+    local function Toggle(key, text, x)
         local button = CreateFrame("Button", nil, help, "UIPanelButtonTemplate")
         button:SetWidth(200)
         button:SetHeight(40)
@@ -389,11 +397,8 @@ do
 
         button:SetScript("OnClick", function()
             SwitchControlsDB[key] = not SwitchControlsDB[key]
+            SwitchControls_SetOption(key, SwitchControlsDB[key])
             Refresh()
-
-            if onChange then
-                onChange(SwitchControlsDB[key])
-            end
         end)
 
         button:SetScript("OnShow", Refresh)
@@ -401,9 +406,7 @@ do
     end
 
     Toggle("hints", "Hint bar", 30)
-    Toggle("invertLook", "Invert camera", 250, function(on)
-        SwitchControls_SetOption("invertLook", on)
-    end)
+    Toggle("invertLook", "Invert camera", 250)
 
     local close = CreateFrame("Button", nil, help, "UIPanelButtonTemplate")
     close:SetWidth(180)
@@ -425,8 +428,11 @@ local function ToggleHelp()
     end
 end
 
--- Clicking the right stick sends F17 (Os/Switch/Input.cpp), which clicks this button: the nearest lootable
--- body, NPC or usable object, as a right-click on it would.
+-- The Interact key binding (Bindings.xml, on F17 by default: the right stick click, Os/Switch/Input.cpp) clicks this
+-- button: the nearest lootable body, NPC or usable object, as a right-click on it would. A normal binding, so it can
+-- be moved to another button in Key Bindings and the right stick click given something else.
+BINDING_HEADER_SWITCHCONTROLS = "Switch Controls"
+BINDING_NAME_SWITCHCONTROLS_INTERACT = "Interact (loot, talk, use)"
 local interact = CreateFrame("Button", "SwitchControlsInteract", UIParent)
 interact:SetScript("OnClick", function()
     if not SwitchControls_Interact() then
@@ -615,37 +621,139 @@ frame:SetScript("OnUpdate", function(self, elapsed)
     mode = UpdateCursor(mode)
 
     if SwitchControlsDB.hints then
-        ShowHints(textFocus and "text" or mode)
+        local capture = KeyBindingFrame and KeyBindingFrame:IsShown() and KeyBindingFrame.selected ~= nil
+        ShowHints(textFocus and "text" or capture and "bind" or mode)
         hintBar:Show()
     else
         hintBar:Hide()
     end
 end)
 
+---------------------------------------------------------------------------------------------------------------------
+-- Options: kept by the Switch build in Registry.txt as soon as they change (SwitchControlsDB is written only on a clean
+-- logout or quit, which closing the game from the HOME menu skips). An option the Switch build has never stored comes
+-- from SwitchControlsDB, as earlier versions kept it, or the default.
+
+local OPTION_DEFAULTS = {
+    hints = true,
+    invertLook = false,
+}
+
+local function LoadOptions()
+    for key, default in pairs(OPTION_DEFAULTS) do
+        local value = SwitchControls_GetOption(key)
+
+        if value == nil then
+            value = SwitchControlsDB[key]
+
+            if value == nil then
+                value = default
+            end
+
+            SwitchControls_SetOption(key, value)
+        elseif key == "invertLook" then
+            SwitchControls_SetOption(key, value)
+        end
+
+        SwitchControlsDB[key] = value
+    end
+end
+
+-- Interact starts on the right stick click (F17), unless that key or the action is bound already.
+local function BindInteract()
+    if InCombatLockdown() or GetBindingKey("SWITCHCONTROLS_INTERACT") or GetBindingAction("F17") ~= "" then
+        return
+    end
+
+    if SetBinding("F17", "SWITCHCONTROLS_INTERACT") then
+        SaveBindings(GetCurrentBindingSet())
+    end
+end
+
+---------------------------------------------------------------------------------------------------------------------
+-- Key Bindings window (Blizzard_BindingUI, loaded on demand): while a row waits for a key, the controller sends keys
+-- rather than clicks, so every button can be bound; Plus cancels instead of binding Escape; keys a controller button
+-- sends show as that button.
+
+local keyBindingsSetUp = false
+
+local function UpdateKeyCapture()
+    local capture = KeyBindingFrame and KeyBindingFrame:IsShown() and KeyBindingFrame.selected ~= nil or false
+    SwitchControls_SetKeyCapture(capture)
+end
+
+local function ShowBindingGlyphs()
+    for i = 1, KEY_BINDINGS_DISPLAYED or 17 do
+        for keyID = 1, 2 do
+            local button = _G["KeyBindingFrameBinding" .. i .. "Key" .. keyID .. "Button"]
+
+            if button and button:IsShown() and button.commandName then
+                local key = select(keyID, GetBindingKey(button.commandName, KeyBindingFrame.mode))
+                local glyphs = KeyGlyphs(key, 16)
+
+                if glyphs then
+                    button:SetText(glyphs)
+                end
+            end
+        end
+    end
+end
+
+local function SetUpKeyBindings()
+    if keyBindingsSetUp or not KeyBindingFrame then
+        return
+    end
+
+    keyBindingsSetUp = true
+
+    hooksecurefunc("KeyBindingFrame_SetSelected", UpdateKeyCapture)
+    hooksecurefunc("KeyBindingFrame_Update", ShowBindingGlyphs)
+    KeyBindingFrame:HookScript("OnShow", UpdateKeyCapture)
+    KeyBindingFrame:HookScript("OnHide", UpdateKeyCapture)
+
+    -- Plus sends Escape, which would be bound to the waiting row; it cancels the row instead. Holding Minus sends F19
+    -- (the controls list), which isn't a key to bind either.
+    local onKeyDown = KeyBindingFrame:GetScript("OnKeyDown")
+
+    KeyBindingFrame:SetScript("OnKeyDown", function(self, key)
+        if self.selected and (key == "ESCAPE" or key == "F19") then
+            if self.buttonPressed then
+                self.buttonPressed:UnlockHighlight()
+            end
+
+            KeyBindingFrameOutputText:SetText("")
+            KeyBindingFrame_SetSelected(nil)
+            KeyBindingFrame_Update()
+            KeyBindingFrame_UpdateUnbindKey()
+            return
+        end
+
+        onKeyDown(self, key)
+    end)
+end
+
 local entered = false
 
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+frame:RegisterEvent("VARIABLES_LOADED")
 frame:RegisterEvent("PLAYER_LOGOUT")
 frame:RegisterEvent("UPDATE_BINDINGS")
 
 frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "SwitchControls" then
         SwitchControlsDB = SwitchControlsDB or {}
+        LoadOptions()
 
-        if SwitchControlsDB.hints == nil then
-            SwitchControlsDB.hints = true
-        end
-
-        if SwitchControls_SetOption then
-            SwitchControls_SetOption("invertLook", SwitchControlsDB.invertLook and true or false)
+        if IsAddOnLoaded("Blizzard_BindingUI") then
+            SetUpKeyBindings()
         end
     elseif event == "PLAYER_ENTERING_WORLD" then
         -- Only the first time: it also fires after every loading screen.
         if not entered then
             entered = true
             SetOverrideBindingClick(frame, false, "F19", "SwitchControlsHelpToggle")
-            SetOverrideBindingClick(frame, false, "F17", "SwitchControlsInteract")
+            BindInteract()
 
             if not NeedsCursor() then
                 SwitchControls_SetMode("play")
@@ -662,8 +770,14 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         UpdateAllHotkeys()
     elseif event == "UPDATE_BINDINGS" then
         UpdateAllHotkeys()
+    elseif event == "VARIABLES_LOADED" then
+        -- Bindings can arrive after PLAYER_ENTERING_WORLD, replacing the ones set there.
+        BindInteract()
+    elseif event == "ADDON_LOADED" and arg1 == "Blizzard_BindingUI" then
+        SetUpKeyBindings()
     elseif event == "PLAYER_LOGOUT" then
         -- Back to the character screens, which need the pointer.
+        SwitchControls_SetKeyCapture(false)
         SwitchControls_SetMode("cursor")
     end
 end)
@@ -672,6 +786,7 @@ SLASH_SWITCHCONTROLS1 = "/switch"
 SlashCmdList["SWITCHCONTROLS"] = function(arguments)
     if arguments and arguments:lower():match("hints") then
         SwitchControlsDB.hints = not SwitchControlsDB.hints
+        SwitchControls_SetOption("hints", SwitchControlsDB.hints)
         DEFAULT_CHAT_FRAME:AddMessage("Switch Controls: hint bar " .. (SwitchControlsDB.hints and "on" or "off") .. ".")
     elseif help:IsShown() then
         help:Hide()

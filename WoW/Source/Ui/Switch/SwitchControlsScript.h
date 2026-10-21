@@ -9,7 +9,9 @@
 //   SwitchControls_SetMode("play" | "cursor")
 //   docked = SwitchControls_IsDocked()
 //   SwitchControls_Log(text)                              a line in Logs/Console.txt
-//   SwitchControls_SetOption("invertLook", on)            controller options
+//   on = SwitchControls_GetOption(name)                   controller options ("invertLook", "hints"), saved in
+//   SwitchControls_SetOption(name, on)                    Registry.txt as soon as they change; nil if never set
+//   SwitchControls_SetKeyCapture(on)                      the Key Bindings window is waiting for a key
 //   interacted = SwitchControls_Interact()                right-click the nearest lootable body, NPC or usable object
 
 void SwitchControlsRegisterScriptFunctions();
