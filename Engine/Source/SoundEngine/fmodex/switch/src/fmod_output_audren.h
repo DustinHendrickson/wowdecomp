@@ -1,8 +1,13 @@
 /*
     Audio renderer (audren) output for FMOD Ex on the Nintendo Switch (wowdecomp). Polled like the CoreAudio output on
-    macOS: FMOD mixes into a ring of blocksize * numblocks samples, and a feeder thread copies the ring into the wave
-    buffers of one renderer voice in order, counting what it has handed over as played. getPosition reports that count,
-    and the FMOD mixer thread fills each block once the play cursor has passed it.
+    macOS: FMOD mixes into a ring of blocksize * numblocks samples, and the ring is copied into the wave buffers of a
+    renderer voice in order, counting what has been handed over as played. getPosition reports that count, and the FMOD
+    mixer thread fills each block once the play cursor has passed it.
+
+    The game runs several FMOD systems at once (its own, one kept open to enumerate devices, voice chat), each with an
+    output, but the process has one audio renderer session. Two libnx audio drivers on it overwrite each other's state
+    with every update: buffers stop completing and what plays tears. So there is one driver, shared: each output gets
+    its own voice, memory pool and wave buffers in it, and one service thread refills them all, every renderer frame.
 
     The voice plays 48 kHz stereo PCM16; other channel counts are folded to stereo as they are copied out. (The simpler
     audout service refuses to start for homebrew on some systems; the renderer is what SDL and most homebrew use.)
@@ -30,7 +35,8 @@ namespace FMOD
         */
         enum { NUMHWBUFFERS = 6, HWFRAMES = 256 };
 
-        void                       *mDriver;                      /* AudioDriver */
+        int                         mVoice;                       /* in the shared driver; -1 for none */
+        int                         mPoolId;
         void                       *mPool;                        /* the wave buffers' memory */
         size_t                      mPoolBytes;
         void                       *mWaveBuf[NUMHWBUFFERS];       /* AudioDriverWaveBuf */
@@ -40,13 +46,12 @@ namespace FMOD
         unsigned int                mChannels;
         unsigned int                mReadFrame;
         volatile unsigned int       mPlayed;
-        volatile bool               mRunning;
-        bool                        mThreadStarted;
-        bool                        mRendererStarted;              /* audrenInitialize succeeded */
-        void                       *mThread;                      /* pthread_t */
+        bool                        mRendererUser;                /* holds a reference on the shared driver */
 
-        static void                *feederThread(void *param);
+        static void                *serviceThread(void *param);
         void                        fill(short *dst);
+        void                        service(void *driver);
+        void                        detach();
 
       public:
 

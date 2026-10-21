@@ -88,80 +88,172 @@ void OutputAudren::fill(short *dst)
 
 namespace
 {
+    /* Up to four stereo voices: each channel of a voice takes one of the renderer's voice channels. */
+    enum { MAXOUTPUTS = 4 };
+
     const AudioRendererConfig kRendererConfig =
     {
         AudioRendererOutputRate_48kHz,
-        4,      /* voices: renderer channels, one per channel of a voice, so the stereo voice takes two */
-        0,      /* effects */
-        1,      /* sinks */
-        1,      /* mix objects */
-        2,      /* mix buffers: stereo */
+        2 * MAXOUTPUTS, /* voice channels */
+        0,              /* effects */
+        1,              /* sinks */
+        1,              /* mix objects */
+        2,              /* mix buffers: stereo */
     };
+
+    /* The process's one renderer session and driver, and the outputs it plays. Everything here is under sLock. */
+    pthread_mutex_t   sLock = PTHREAD_MUTEX_INITIALIZER;
+    AudioDriver       sDriver;
+    int               sUsers;
+    FMOD::OutputAudren *sOutputs[MAXOUTPUTS];      /* by voice; set while started */
+    bool              sVoiceUsed[MAXOUTPUTS];
+    bool              sServiceRunning;
+    pthread_t         sServiceThread;
+
+    /* Called with sLock held. */
+    bool AcquireRenderer()
+    {
+        if (sUsers)
+        {
+            sUsers++;
+            return true;
+        }
+
+        Result rc = audrenInitialize(&kRendererConfig);
+
+        if (R_FAILED(rc))
+        {
+            fprintf(stderr, "FMOD audren: audrenInitialize failed (0x%x, module %u, description %u)\n", rc, R_MODULE(rc), R_DESCRIPTION(rc));
+            return false;
+        }
+
+        rc = audrvCreate(&sDriver, &kRendererConfig, 2);
+
+        if (R_FAILED(rc))
+        {
+            fprintf(stderr, "FMOD audren: audrvCreate failed (0x%x, module %u, description %u)\n", rc, R_MODULE(rc), R_DESCRIPTION(rc));
+            audrenExit();
+            return false;
+        }
+
+        static const u8 sinkChannels[2] = { 0, 1 };
+        audrvDeviceSinkAdd(&sDriver, AUDREN_DEFAULT_DEVICE_NAME, 2, sinkChannels);
+
+        rc = audrvUpdate(&sDriver);
+
+        if (R_SUCCEEDED(rc))
+        {
+            rc = audrenStartAudioRenderer();
+        }
+
+        if (R_FAILED(rc))
+        {
+            fprintf(stderr, "FMOD audren: starting the renderer failed (0x%x, module %u, description %u)\n", rc, R_MODULE(rc), R_DESCRIPTION(rc));
+            audrvClose(&sDriver);
+            audrenExit();
+            return false;
+        }
+
+        sUsers = 1;
+        return true;
+    }
+
+    /* Called with sLock held. */
+    void ReleaseRenderer()
+    {
+        if (!sUsers || --sUsers)
+        {
+            return;
+        }
+
+        audrvClose(&sDriver);
+        audrenExit();
+    }
 }
 
-void *OutputAudren::feederThread(void *param)
+/*
+    One thread for every output: the renderer's frame event wakes a single waiter, so a thread per output would leave all
+    but one of them asleep. Each renderer frame (5 ms) it reads the buffer states, refills every played buffer of every
+    output from that output's ring and queues it again.
+*/
+void *OutputAudren::serviceThread(void *param)
 {
-    OutputAudren *output = (OutputAudren *)param;
-    AudioDriver  *driver = (AudioDriver *)output->mDriver;
-
     wowdecomp_switch_thread_start(WOWDECOMP_THREAD_AUDIO_OUTPUT);
 
-
-    /*
-        Keep every wave buffer queued: one that has played (or was never queued) is refilled from the ring and queued
-        again. The renderer runs a frame every 5 ms; waiting for one keeps this loop in step with it.
-    */
-    while (output->mRunning)
+    while (true)
     {
-        bool queued = false;
-        int  idle = 0;
+        pthread_mutex_lock(&sLock);
 
-        for (int i = 0; i < NUMHWBUFFERS; i++)
+        if (!sServiceRunning)
         {
-            AudioDriverWaveBuf *buffer = (AudioDriverWaveBuf *)output->mWaveBuf[i];
+            pthread_mutex_unlock(&sLock);
+            break;
+        }
 
-            if (buffer->state == AudioDriverWaveBufState_Free || buffer->state == AudioDriverWaveBufState_Done)
+        wowdecomp_switch_perf_audio_refill();
+
+        /* Current buffer states first, then refills, then the refills sent. */
+        audrvUpdate(&sDriver);
+
+        for (int i = 0; i < MAXOUTPUTS; i++)
+        {
+            if (sOutputs[i])
             {
-                idle++;
+                sOutputs[i]->service(&sDriver);
             }
         }
 
-        /* Every buffer played out before it was refilled: an underrun, for the performance report. */
-        if (idle == NUMHWBUFFERS && output->mPlayed)
-        {
-            wowdecomp_switch_perf_audio_underrun();
-        }
+        audrvUpdate(&sDriver);
+        pthread_mutex_unlock(&sLock);
 
-        if (idle)
-        {
-            wowdecomp_switch_perf_audio_refill();
-        }
-
-
-        for (int i = 0; i < NUMHWBUFFERS; i++)
-        {
-            AudioDriverWaveBuf *buffer = (AudioDriverWaveBuf *)output->mWaveBuf[i];
-
-            if (buffer->state == AudioDriverWaveBufState_Free || buffer->state == AudioDriverWaveBufState_Done)
-            {
-                short *samples = (short *)output->mPool + (size_t)i * output->mHwFrames * 2;
-                output->fill(samples);
-                armDCacheFlush(samples, (size_t)output->mHwFrames * 2 * sizeof(short));
-                audrvVoiceAddWaveBuf(driver, 0, buffer);
-                queued = true;
-            }
-        }
-
-        if (queued && !audrvVoiceIsPlaying(driver, 0))
-        {
-            audrvVoiceStart(driver, 0);
-        }
-
-        audrvUpdate(driver);
         audrenWaitFrame();
     }
 
     return 0;
+}
+
+/* Called by the service thread with sLock held. */
+void OutputAudren::service(void *driverParam)
+{
+    AudioDriver *driver = (AudioDriver *)driverParam;
+    int          idle = 0;
+
+    for (int i = 0; i < NUMHWBUFFERS; i++)
+    {
+        AudioDriverWaveBuf *buffer = (AudioDriverWaveBuf *)mWaveBuf[i];
+
+        if (buffer->state == AudioDriverWaveBufState_Free || buffer->state == AudioDriverWaveBufState_Done)
+        {
+            idle++;
+        }
+    }
+
+    /* Every buffer played out before it was refilled. */
+    if (idle == NUMHWBUFFERS && mPlayed)
+    {
+        wowdecomp_switch_perf_audio_underrun();
+    }
+
+    bool queued = false;
+
+    for (int i = 0; i < NUMHWBUFFERS; i++)
+    {
+        AudioDriverWaveBuf *buffer = (AudioDriverWaveBuf *)mWaveBuf[i];
+
+        if (buffer->state == AudioDriverWaveBufState_Free || buffer->state == AudioDriverWaveBufState_Done)
+        {
+            short *samples = (short *)mPool + (size_t)i * mHwFrames * 2;
+            fill(samples);
+            armDCacheFlush(samples, (size_t)mHwFrames * 2 * sizeof(short));
+            audrvVoiceAddWaveBuf(driver, mVoice, buffer);
+            queued = true;
+        }
+    }
+
+    if (queued && !audrvVoiceIsPlaying(driver, mVoice))
+    {
+        audrvVoiceStart(driver, mVoice);
+    }
 }
 
 FMOD_RESULT OutputAudren::getNumDrivers(int *numdrivers)
@@ -190,17 +282,15 @@ FMOD_RESULT OutputAudren::init(int selecteddriver, FMOD_INITFLAGS flags, int *ou
 
     Plugin::init();     /* Sets up gGlobal for this plugin's debug / file / memory access. */
 
-    mBuffer          = 0;
-    mReadFrame       = 0;
-    mPlayed          = 0;
-    mRunning         = false;
-    mThreadStarted   = false;
-    mRendererStarted = false;
-    mThread          = 0;
-    mDriver          = 0;
-    mPool            = 0;
-    mPoolBytes       = 0;
-    mChannels        = outputchannels > 0 ? outputchannels : 2;
+    mBuffer       = 0;
+    mReadFrame    = 0;
+    mPlayed       = 0;
+    mVoice        = -1;
+    mPoolId       = -1;
+    mPool         = 0;
+    mPoolBytes    = 0;
+    mRendererUser = false;
+    mChannels     = outputchannels > 0 ? outputchannels : 2;
 
     for (int i = 0; i < NUMHWBUFFERS; i++)
     {
@@ -224,35 +314,7 @@ FMOD_RESULT OutputAudren::init(int selecteddriver, FMOD_INITFLAGS flags, int *ou
         return FMOD_ERR_MEMORY;
     }
 
-    Result rc = audrenInitialize(&kRendererConfig);
-
-    if (R_FAILED(rc))
-    {
-        fprintf(stderr, "FMOD audren: audrenInitialize failed (0x%x, module %u, description %u)\n", rc, R_MODULE(rc), R_DESCRIPTION(rc));
-        return FMOD_ERR_OUTPUT_INIT;
-    }
-
-    mRendererStarted = true;
-
-    AudioDriver *driver = (AudioDriver *)calloc(1, sizeof(AudioDriver));
-    mDriver = driver;
-
-    if (!driver)
-    {
-        return FMOD_ERR_MEMORY;
-    }
-
-    rc = audrvCreate(driver, &kRendererConfig, 2);
-
-    if (R_FAILED(rc))
-    {
-        fprintf(stderr, "FMOD audren: audrvCreate failed (0x%x, module %u, description %u)\n", rc, R_MODULE(rc), R_DESCRIPTION(rc));
-        free(driver);
-        mDriver = 0;
-        return FMOD_ERR_OUTPUT_INIT;
-    }
-
-    /* The wave buffers live in one memory pool the renderer reads from: page aligned, sizes in whole pages. */
+    /* The wave buffers live in a memory pool the renderer reads from: page aligned, sizes in whole pages. */
     mPoolBytes = ((size_t)mHwFrames * 2 * sizeof(short) * NUMHWBUFFERS + AUDREN_MEMPOOL_ALIGNMENT - 1) & ~(size_t)(AUDREN_MEMPOOL_ALIGNMENT - 1);
     mPool = aligned_alloc(AUDREN_MEMPOOL_ALIGNMENT, mPoolBytes);
 
@@ -263,43 +325,6 @@ FMOD_RESULT OutputAudren::init(int selecteddriver, FMOD_INITFLAGS flags, int *ou
 
     memset(mPool, 0, mPoolBytes);
     armDCacheFlush(mPool, mPoolBytes);
-
-    int pool = audrvMemPoolAdd(driver, mPool, mPoolBytes);
-
-    if (pool < 0 || !audrvMemPoolAttach(driver, pool))
-    {
-        fprintf(stderr, "FMOD audren: memory pool rejected\n");
-        return FMOD_ERR_OUTPUT_INIT;
-    }
-
-    static const u8 sinkChannels[2] = { 0, 1 };
-    audrvDeviceSinkAdd(driver, AUDREN_DEFAULT_DEVICE_NAME, 2, sinkChannels);
-
-    rc = audrvUpdate(driver);
-
-    if (R_SUCCEEDED(rc))
-    {
-        rc = audrenStartAudioRenderer();
-    }
-
-    if (R_FAILED(rc))
-    {
-        fprintf(stderr, "FMOD audren: starting the renderer failed (0x%x, module %u, description %u)\n", rc, R_MODULE(rc), R_DESCRIPTION(rc));
-        return FMOD_ERR_OUTPUT_INIT;
-    }
-
-    /* One stereo voice, left to left and right to right. */
-    if (!audrvVoiceInit(driver, 0, 2, PcmFormat_Int16, 48000))
-    {
-        fprintf(stderr, "FMOD audren: voice rejected\n");
-        return FMOD_ERR_OUTPUT_INIT;
-    }
-
-    audrvVoiceSetDestinationMix(driver, 0, AUDREN_FINAL_MIX_ID);
-    audrvVoiceSetMixFactor(driver, 0, 1.0f, 0, 0);
-    audrvVoiceSetMixFactor(driver, 0, 0.0f, 0, 1);
-    audrvVoiceSetMixFactor(driver, 0, 0.0f, 1, 0);
-    audrvVoiceSetMixFactor(driver, 0, 1.0f, 1, 1);
 
     for (int i = 0; i < NUMHWBUFFERS; i++)
     {
@@ -317,33 +342,83 @@ FMOD_RESULT OutputAudren::init(int selecteddriver, FMOD_INITFLAGS flags, int *ou
         buffer->end_sample_offset   = (s32)((i + 1) * mHwFrames);
     }
 
-    fprintf(stderr, "FMOD audren: 48000 Hz stereo, %u-frame buffers, FMOD mixes %d channels\n", mHwFrames, outputchannels);
+    pthread_mutex_lock(&sLock);
+
+    if (!AcquireRenderer())
+    {
+        pthread_mutex_unlock(&sLock);
+        return FMOD_ERR_OUTPUT_INIT;
+    }
+
+    mRendererUser = true;
+
+    for (int i = 0; i < MAXOUTPUTS; i++)
+    {
+        if (!sVoiceUsed[i])
+        {
+            sVoiceUsed[i] = true;
+            mVoice = i;
+            break;
+        }
+    }
+
+    mPoolId = mVoice >= 0 ? audrvMemPoolAdd(&sDriver, mPool, mPoolBytes) : -1;
+
+    /* One stereo voice, left to left and right to right. */
+    bool ready = mPoolId >= 0 && audrvMemPoolAttach(&sDriver, mPoolId) && audrvVoiceInit(&sDriver, mVoice, 2, PcmFormat_Int16, 48000);
+
+    if (ready)
+    {
+        audrvVoiceSetDestinationMix(&sDriver, mVoice, AUDREN_FINAL_MIX_ID);
+        audrvVoiceSetMixFactor(&sDriver, mVoice, 1.0f, 0, 0);
+        audrvVoiceSetMixFactor(&sDriver, mVoice, 0.0f, 0, 1);
+        audrvVoiceSetMixFactor(&sDriver, mVoice, 0.0f, 1, 0);
+        audrvVoiceSetMixFactor(&sDriver, mVoice, 1.0f, 1, 1);
+        audrvUpdate(&sDriver);
+    }
+
+    pthread_mutex_unlock(&sLock);
+
+    if (!ready)
+    {
+        fprintf(stderr, "FMOD audren: no voice for this output (voice %d, pool %d)\n", mVoice, mPoolId);
+        return FMOD_ERR_OUTPUT_INIT;
+    }
+
+    fprintf(stderr, "FMOD audren: voice %d, 48000 Hz stereo, %u-frame buffers, FMOD mixes %d channels\n", mVoice, mHwFrames, outputchannels);
 
     return FMOD_OK;
 }
 
 FMOD_RESULT OutputAudren::close()
 {
-    mRunning = false;
+    detach();
 
-    if (mThreadStarted)
+    pthread_mutex_lock(&sLock);
+
+    if (mVoice >= 0)
     {
-        pthread_join((pthread_t)mThread, 0);
-        mThreadStarted = false;
+        audrvVoiceStop(&sDriver, mVoice);
+        audrvVoiceDrop(&sDriver, mVoice);
+        sVoiceUsed[mVoice] = false;
+        mVoice = -1;
     }
 
-    if (mDriver)
+    if (mPoolId >= 0)
     {
-        audrvClose((AudioDriver *)mDriver);
-        free(mDriver);
-        mDriver = 0;
+        audrvMemPoolDetach(&sDriver, mPoolId);
+        audrvMemPoolRemove(&sDriver, mPoolId);
+        mPoolId = -1;
     }
 
-    if (mRendererStarted)
+    if (mRendererUser)
     {
-        audrenExit();
-        mRendererStarted = false;
+        audrvUpdate(&sDriver);
+        ReleaseRenderer();
+        mRendererUser = false;
     }
+
+    pthread_mutex_unlock(&sLock);
 
     for (int i = 0; i < NUMHWBUFFERS; i++)
     {
@@ -378,45 +453,72 @@ FMOD_RESULT OutputAudren::start()
         return result;
     }
 
-    mRunning = true;
+    pthread_mutex_lock(&sLock);
 
-    pthread_attr_t attributes;
-    pthread_t      thread;
-
-    pthread_attr_init(&attributes);
-    pthread_attr_setstacksize(&attributes, 64 * 1024);
-    int created = pthread_create(&thread, &attributes, feederThread, this);
-    pthread_attr_destroy(&attributes);
-
-    if (created)
+    if (mVoice >= 0)
     {
-        mRunning = false;
-        return FMOD_ERR_OUTPUT_DRIVERCALL;
+        sOutputs[mVoice] = this;
     }
 
-    mThread        = (void *)thread;
-    mThreadStarted = true;
-    return FMOD_OK;
+    if (!sServiceRunning)
+    {
+        pthread_attr_t attributes;
+        pthread_attr_init(&attributes);
+        pthread_attr_setstacksize(&attributes, 64 * 1024);
+        sServiceRunning = pthread_create(&sServiceThread, &attributes, serviceThread, 0) == 0;
+        pthread_attr_destroy(&attributes);
+    }
+
+    bool running = sServiceRunning;
+    pthread_mutex_unlock(&sLock);
+
+    return running ? FMOD_OK : FMOD_ERR_OUTPUT_DRIVERCALL;
+}
+
+/* Takes this output's voice off the service thread, and stops the thread with the last one. */
+void OutputAudren::detach()
+{
+    bool lastOutput = false;
+    pthread_t thread;
+
+    pthread_mutex_lock(&sLock);
+
+    if (mVoice >= 0 && sOutputs[mVoice] == this)
+    {
+        sOutputs[mVoice] = 0;
+        audrvVoiceStop(&sDriver, mVoice);
+        audrvUpdate(&sDriver);
+    }
+
+    lastOutput = sServiceRunning;
+
+    for (int i = 0; i < MAXOUTPUTS; i++)
+    {
+        if (sOutputs[i])
+        {
+            lastOutput = false;
+        }
+    }
+
+    /* The service thread stops with the last output, outside the lock it takes. */
+    if (lastOutput)
+    {
+        sServiceRunning = false;
+        thread = sServiceThread;
+    }
+
+    pthread_mutex_unlock(&sLock);
+
+    if (lastOutput)
+    {
+        pthread_join(thread, 0);
+    }
 }
 
 FMOD_RESULT OutputAudren::stop()
 {
-    FMOD_RESULT result = OutputPolled::stop();
-
-    if (result != FMOD_OK)
-    {
-        return result;
-    }
-
-    mRunning = false;
-
-    if (mThreadStarted)
-    {
-        pthread_join((pthread_t)mThread, 0);
-        mThreadStarted = false;
-    }
-
-    return FMOD_OK;
+    detach();
+    return OutputPolled::stop();
 }
 
 FMOD_RESULT OutputAudren::getPosition(unsigned int *pcm)
