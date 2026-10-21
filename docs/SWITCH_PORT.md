@@ -88,8 +88,10 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 - **Touch screen**: tap to left-click, drag to left-drag, touch and hold for half a second to right-click.
 - **Controller** (handheld, Joy-Cons, Pro Controller), in two modes. A short press of **Minus** switches between
   them; **holding Minus** opens and closes the controls list. The login and character screens start in cursor mode; entering the world switches to play
-  mode, and opening a menu or window (game menu, bags, character, spellbook, loot, popups, ...) switches to cursor mode
-  until it closes. Going back to play mode with a window open keeps play mode until the windows close.
+  mode, and opening a menu or window (game menu, bags, character, spellbook, loot, popups, ...) in play mode switches to
+  cursor mode. Closing the window that did it (and any opened from it, like a vendor from an NPC's talk window) goes
+  back to play mode, even if other windows such as bags stay open; the **Back to play** option turns that off. Going
+  back to play mode with windows open keeps play mode until another window opens.
 
 | Play mode | | Cursor mode | |
 |---|---|---|---|
@@ -127,8 +129,9 @@ start, so it always matches the build):
   dims after a few seconds and comes back when the mode changes. Tapping it opens the controls list.
 - Action buttons are labeled with the controller buttons that press them (A, ZL+X, D-pad, ...) instead of key names.
   Keys no controller button sends keep their usual labels.
-- The controls list has two options: **Hint bar** on / off, and **Invert camera** (the right stick's up and down; the
-  game's own mouse invert doesn't reach the stick). Both are saved in `Registry.txt` the moment they change, so they
+- The controls list has three options: **Hint bar** on / off, **Invert camera** (the right stick's up and down; the
+  game's own mouse invert doesn't reach the stick), and **Back to play** (on: closing a window that brought the cursor
+  returns to play mode; off: the cursor stays until Minus). All are saved in `Registry.txt` the moment they change, so they
   survive closing the game from the HOME menu (the add-on's saved variables are written only on a clean logout).
 - A controls list opens the first time you enter the world. Hold **Minus**, tap the hint bar, or press **X** in cursor
   mode to open it again; the same, **Plus**, or its Close button closes it. (`/switch hints` turns the hint bar off and

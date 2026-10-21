@@ -406,7 +406,8 @@ do
     end
 
     Toggle("hints", "Hint bar", 30)
-    Toggle("invertLook", "Invert camera", 250)
+    Toggle("invertLook", "Invert camera", 245)
+    Toggle("returnToPlay", "Back to play", 460)
 
     local close = CreateFrame("Button", nil, help, "UIPanelButtonTemplate")
     close:SetWidth(180)
@@ -462,13 +463,15 @@ local WINDOWS = {
     "PetitionFrame", "TradeSkillFrame", "SpellBookFrame", "CharacterFrame", "FriendsFrame", "PVPFrame",
 }
 
--- The windows that want the pointer: how many are open, and the first one's name.
+-- The windows that want the pointer that are open, as a set, and how many.
 local function OpenWindows()
-    local count, first = 0, nil
+    local open, count = {}, 0
 
     local function Add(window)
-        count = count + 1
-        first = first or (window.GetName and window:GetName()) or "?"
+        if not open[window] then
+            open[window] = true
+            count = count + 1
+        end
     end
 
     if GetUIPanel then
@@ -497,18 +500,26 @@ local function OpenWindows()
         end
     end
 
-    return count, first
+    return open, count
 end
 
 local function NeedsCursor()
-    return OpenWindows() > 0
+    local _, count = OpenWindows()
+    return count > 0
 end
 
--- auto: cursor mode is on because a window wanted it, and goes when the windows do. suppressed: the player went back to
--- play mode with windows open, so leave it until they close or another one opens.
+local function WindowName(window)
+    return window.GetName and window:GetName() or "a window"
+end
+
+-- In play mode, a window opening switches to cursor mode ("auto"). The windows that brought the cursor, and any opened
+-- while it is up (gossip leading to a vendor, a confirmation popup), are its triggers: when the last of them closes,
+-- the "returnToPlay" option goes back to play mode, even with other windows (bags kept open, say) still up. Windows
+-- already open when play mode came back don't bring the cursor again; only a newly opened one does. Cursor mode the
+-- player chose is left alone.
 local auto = false
-local suppressed = false
-local lastCount = 0
+local triggers = {}
+local lastOpen = {}
 
 local function Log(text)
     if SwitchControls_Log then
@@ -517,44 +528,62 @@ local function Log(text)
 end
 
 local function UpdateCursor(mode)
-    local count, first = OpenWindows()
-    local opened = count > lastCount
-    lastCount = count
+    local open = OpenWindows()
+    local opened = {}
 
-    if count == 0 then
-        suppressed = false
+    for window in pairs(open) do
+        if not lastOpen[window] then
+            opened[window] = true
+        end
+    end
 
-        if auto then
-            auto = false
+    lastOpen = open
 
-            if mode == "cursor" then
-                Log("windows closed: play mode")
-                SwitchControls_SetMode("play")
-                return "play"
-            end
+    if mode == "play" then
+        -- The player went back to play mode with the cursor up for a window.
+        auto = false
+        triggers = {}
+
+        local window = next(opened)
+
+        if window then
+            Log(WindowName(window) .. " opened: cursor mode")
+            SwitchControls_SetMode("cursor")
+            auto = true
+            triggers = opened
+            return "cursor"
         end
 
         return mode
     end
 
-    if opened then
-        suppressed = false
+    if not auto then
+        return mode
     end
 
-    if mode == "play" then
-        if auto then
-            auto = false
-            suppressed = true
-            Log("play mode with " .. first .. " open: staying in play mode")
-        elseif not suppressed then
-            Log(first .. " opened: cursor mode")
-            SwitchControls_SetMode("cursor")
-            auto = true
-            return "cursor"
+    for window in pairs(opened) do
+        triggers[window] = true
+    end
+
+    for window in pairs(triggers) do
+        if not open[window] then
+            triggers[window] = nil
         end
     end
 
-    return mode
+    if next(triggers) then
+        return mode
+    end
+
+    auto = false
+
+    if SwitchControlsDB and SwitchControlsDB.returnToPlay == false then
+        return mode
+    end
+
+    Log("windows closed: play mode")
+    SwitchControls_SetMode("play")
+    return "play"
 end
 
 ---------------------------------------------------------------------------------------------------------------------
@@ -637,6 +666,7 @@ end)
 local OPTION_DEFAULTS = {
     hints = true,
     invertLook = false,
+    returnToPlay = true,
 }
 
 local function LoadOptions()
