@@ -461,6 +461,9 @@ local WINDOWS = {
     "GossipFrame", "MerchantFrame", "QuestFrame", "QuestLogFrame", "TaxiFrame", "ClassTrainerFrame", "BankFrame",
     "MailFrame", "OpenMailFrame", "AuctionFrame", "PetStableFrame", "TabardFrame", "GuildRegistrarFrame",
     "PetitionFrame", "TradeSkillFrame", "SpellBookFrame", "CharacterFrame", "FriendsFrame", "PVPFrame",
+    -- The Lua error dialog sits in the middle of the screen, where the right stick's look clicks: it needs the cursor
+    -- to be closed, or the camera can't turn.
+    "BasicScriptErrors", "ScriptErrors",
 }
 
 -- The windows that want the pointer that are open, as a set, and how many.
