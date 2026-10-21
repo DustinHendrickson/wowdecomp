@@ -92,6 +92,13 @@ void NxMainRedirectConsole() {
     setvbuf(stderr, nullptr, _IONBF, 0);
 
     fprintf(stderr, "World of Warcraft for Switch, build %s (%s %s)\n", WOWDECOMP_BUILD_ID, __DATE__, __TIME__);
+
+    // How the game was started and the memory it got: about 3.2 GB over a game, under 0.5 GB as an applet.
+    u64 total = 0;
+    u64 used = 0;
+    svcGetInfo(&total, InfoType_TotalMemorySize, CUR_PROCESS_HANDLE, 0);
+    svcGetInfo(&used, InfoType_UsedMemorySize, CUR_PROCESS_HANDLE, 0);
+    fprintf(stderr, "Applet type %d, memory %llu MB, used %llu MB at start\n", static_cast<int>(appletGetAppletType()), static_cast<unsigned long long>(total >> 20), static_cast<unsigned long long>(used >> 20));
 }
 
 void NxMainShutdown() {
