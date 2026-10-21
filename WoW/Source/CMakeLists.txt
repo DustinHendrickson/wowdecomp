@@ -99,9 +99,14 @@ if (WOWDECOMP_PLATFORM_SWITCH)
     set(WOW_ROMFS ${CMAKE_SOURCE_DIR}/Tools/Switch/romfs)
     file(GLOB_RECURSE WOW_ROMFS_FILES CONFIGURE_DEPENDS ${WOW_ROMFS}/*)
 
+    # The Homebrew Menu shows the version: the build ID, so the installed build can be checked before starting it.
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/BuildId.txt.in "${WOWDECOMP_BUILD_ID}")
+    configure_file(${CMAKE_CURRENT_BINARY_DIR}/BuildId.txt.in ${CMAKE_CURRENT_BINARY_DIR}/BuildId.txt COPYONLY)
+
     add_custom_command(
         OUTPUT ${WOW_NACP}
-        COMMAND ${NX_TOOLS}/nacptool --create "World of Warcraft" "wowdecomp" "3.3.5.12340" ${WOW_NACP}
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/BuildId.txt
+        COMMAND ${NX_TOOLS}/nacptool --create "World of Warcraft" "wowdecomp" "3.3.5 ${WOWDECOMP_BUILD_ID}" ${WOW_NACP}
         VERBATIM
     )
 
@@ -114,6 +119,13 @@ if (WOWDECOMP_PLATFORM_SWITCH)
     )
 
     add_custom_target(WowNro ALL DEPENDS ${WOW_NRO})
+
+    # Every build's symbols, by build ID, to read crash logs from builds that have since been replaced.
+    add_custom_command(TARGET Wow POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${WOWDECOMP_BIN_DIR}/elf
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:Wow> ${WOWDECOMP_BIN_DIR}/elf/Wow-${WOWDECOMP_BUILD_ID}.elf
+        VERBATIM
+    )
 endif ()
 
 target_link_libraries(Wow
