@@ -61,7 +61,13 @@ endif ()
 
 # Off by default: the client checks MPQ file MD5s (signaturefile) and GlueXML/FrameXML/AddOn .toc.sig files like the
 # original. ON accepts unsigned or modified game data and interface files.
-option(WOWDECOMP_DISABLE_SIGNATURE_CHECKS "Skip MPQ file signature and .toc signature checks" OFF)
+# ON by default on the Switch, whose players copy Data from wherever they have it, mods included.
+if (WOWDECOMP_PLATFORM_SWITCH)
+    set(WOWDECOMP_SIGNATURE_CHECKS_DEFAULT ON)
+else ()
+    set(WOWDECOMP_SIGNATURE_CHECKS_DEFAULT OFF)
+endif ()
+option(WOWDECOMP_DISABLE_SIGNATURE_CHECKS "Skip MPQ file signature and .toc signature checks" ${WOWDECOMP_SIGNATURE_CHECKS_DEFAULT})
 if (WOWDECOMP_DISABLE_SIGNATURE_CHECKS)
     add_compile_definitions(DISABLE_SIGNATURE_CHECKS=1)
 endif ()

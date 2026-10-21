@@ -32,6 +32,9 @@ Docker (Docker Desktop on a Mac) is all you need; the first run builds the image
 Tools/Switch/build.sh
 ```
 
+Switch builds skip the MPQ and interface signature checks (`WOWDECOMP_DISABLE_SIGNATURE_CHECKS`), so a Data folder
+with UI mods or extra patch archives loads; `WOWDECOMP_SIGNATURE_CHECKS=1 Tools/Switch/build.sh` keeps them.
+
 This writes `bin/Switch/WoW.nro` (and `bin/Switch/Wow.elf`, the same program with symbols, for reading crash logs).
 Extra arguments go to `cmake --build`, for example `Tools/Switch/build.sh --target WowNro -j8`.
 
@@ -44,9 +47,9 @@ sdmc:/switch/wow/WoW.nro
 sdmc:/switch/wow/Data/          <- the Data folder of a 3.3.5a (12340) client, about 17 GB
 ```
 
-The MPQs are the same as on Windows and macOS. None of the 3.3.5a archives is over 4 GB, so a FAT32 card works. Copy
-exactly the client's Data: an extra patch archive (a `patch-Z.MPQ` left from a UI mod, say) that replaces interface
-files makes the login screen report "GlueXML is modified or corrupt", as it would on Windows.
+The MPQs are the same as on Windows and macOS. None of the 3.3.5a archives is over 4 GB, so a FAT32 card works. Extra patch
+archives that change interface files (a `patch-Z.MPQ` from a UI mod, say) load, because Switch builds skip the
+signature checks.
 Point `Data/<locale>/realmlist.wtf` at your server before copying. Settings (`WTF/`), logs, screenshots, AddOns and
 `Registry.txt` are written next to `WoW.nro`, as next to `Wow.exe`.
 
