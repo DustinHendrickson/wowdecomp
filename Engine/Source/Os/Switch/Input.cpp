@@ -1378,19 +1378,31 @@ void OsInputEnableSecureMode(int32_t enable) {
     bool focus = enable != 0;
 
     if (focus && !s_secureFocus) {
+        fprintf(stderr, "Input: password box focused\n");
         s_secureFocus = true;
         RequestKeyboard();
-    } else if (!focus) {
+    } else if (!focus && s_secureFocus) {
+        fprintf(stderr, "Input: password box unfocused\n");
         s_secureFocus = false;
     }
 }
 
 void SwitchSetTextFocus(bool focus) {
     if (focus && !s_textFocus) {
+        fprintf(stderr, "Input: text box focused\n");
         s_textFocus = true;
         RequestKeyboard();
-    } else if (!focus) {
+    } else if (!focus && s_textFocus) {
+        fprintf(stderr, "Input: text box unfocused\n");
         s_textFocus = false;
+    }
+}
+
+void SwitchClearTextFocus() {
+    if (s_textFocus || s_secureFocus) {
+        fprintf(stderr, "Input: text focus cleared, no text box has it\n");
+        s_textFocus = false;
+        s_secureFocus = false;
     }
 }
 
@@ -1465,6 +1477,10 @@ void SwitchSetOption(const char* name, bool value) {
 }
 
 void SwitchSetKeyCapture(bool capture) {
+    if (capture != s_keyCapture) {
+        fprintf(stderr, "Input: key binding capture %s\n", capture ? "on" : "off");
+    }
+
     if (capture && !s_keyCapture) {
         EndLook();
     }

@@ -12,6 +12,7 @@
 //   on = SwitchControls_GetOption(name)                   controller options ("invertLook", "hints"), saved in
 //   SwitchControls_SetOption(name, on)                    Registry.txt as soon as they change; nil if never set
 //   SwitchControls_SetKeyCapture(on)                      the Key Bindings window is waiting for a key
+//   SwitchControls_ClearTextFocus()                       no text box has the focus: leave text mode
 //   interacted = SwitchControls_Interact()                right-click the nearest lootable body, NPC or usable object
 
 void SwitchControlsRegisterScriptFunctions();

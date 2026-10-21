@@ -8,6 +8,10 @@
 // A text box gained or lost the keyboard focus (OsIMEEnable). Gaining it opens the software keyboard.
 void SwitchSetTextFocus(bool focus);
 
+// No text box has the focus after all (one was destroyed while focused, so never reported losing it): the controller
+// leaves text mode, whose face buttons edit text and whose sticks send nothing.
+void SwitchClearTextFocus();
+
 // Changes every time the clipboard is written, so Input.cpp can tell whether a copy happened.
 uint32_t SwitchClipboardGeneration();
 

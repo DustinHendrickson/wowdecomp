@@ -634,7 +634,20 @@ end
 
 ---------------------------------------------------------------------------------------------------------------------
 
+-- Whether the Key Bindings window (Blizzard_BindingUI) has a row waiting for a key; the controller then sends keys.
+local keyCapture = false
+
+local function UpdateKeyCapture()
+    local capture = KeyBindingFrame and KeyBindingFrame:IsShown() and KeyBindingFrame.selected ~= nil or false
+
+    if capture ~= keyCapture then
+        keyCapture = capture
+        SwitchControls_SetKeyCapture(capture)
+    end
+end
+
 local elapsedSinceUpdate = 0
+local staleTextFocus = 0
 
 frame:SetScript("OnUpdate", function(self, elapsed)
     elapsedSinceUpdate = elapsedSinceUpdate + elapsed
@@ -650,6 +663,24 @@ frame:SetScript("OnUpdate", function(self, elapsed)
     end
 
     local mode, textFocus = SwitchControls_GetMode()
+
+    -- Text mode with no text box focused: one was destroyed while it had the focus, so the controller never heard it
+    -- lost it, and the sticks would stay dead. Two looks in a row, so a focus change in between doesn't count.
+    if textFocus and not GetCurrentKeyBoardFocus() then
+        staleTextFocus = staleTextFocus + 1
+
+        if staleTextFocus >= 2 then
+            staleTextFocus = 0
+            textFocus = false
+            SwitchControls_ClearTextFocus()
+        end
+    else
+        staleTextFocus = 0
+    end
+
+    -- The same for the Key Bindings window's capture, whose hooks could miss a way of closing it.
+    UpdateKeyCapture()
+
     mode = UpdateCursor(mode)
 
     if SwitchControlsDB.hints then
@@ -721,11 +752,6 @@ end
 -- sends show as that button.
 
 local keyBindingsSetUp = false
-
-local function UpdateKeyCapture()
-    local capture = KeyBindingFrame and KeyBindingFrame:IsShown() and KeyBindingFrame.selected ~= nil or false
-    SwitchControls_SetKeyCapture(capture)
-end
 
 local function ShowBindingGlyphs()
     for i = 1, KEY_BINDINGS_DISPLAYED or 17 do
@@ -856,6 +882,14 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         SwitchControlsDB = SwitchControlsDB or {}
         LoadOptions()
 
+        -- Lua errors also go to Logs/Console.txt, with where they happened, for diagnosing on the console.
+        local handler = geterrorhandler()
+
+        seterrorhandler(function(message, ...)
+            Log("Lua error: " .. tostring(message) .. "\n" .. (debugstack and debugstack(2, 12, 0) or ""))
+            return handler(message, ...)
+        end)
+
         if IsAddOnLoaded("Blizzard_BindingUI") then
             SetUpKeyBindings()
         end
@@ -890,6 +924,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         SetUpKeyBindings()
     elseif event == "PLAYER_LOGOUT" then
         -- Back to the character screens, which need the pointer.
+        keyCapture = false
         SwitchControls_SetKeyCapture(false)
         SwitchControls_SetMode("cursor")
     end

@@ -155,6 +155,11 @@ int32_t Script_SwitchControls_GetOption(lua_State* L) {
     return 1;
 }
 
+int32_t Script_SwitchControls_ClearTextFocus(lua_State* L) {
+    SwitchClearTextFocus();
+    return 0;
+}
+
 int32_t Script_SwitchControls_SetKeyCapture(lua_State* L) {
     SwitchSetKeyCapture(lua_toboolean(L, 1) != 0);
     return 0;
@@ -213,6 +218,7 @@ const struct {
     { "SwitchControls_GetOption", &Script_SwitchControls_GetOption },
     { "SwitchControls_SetOption", &Script_SwitchControls_SetOption },
     { "SwitchControls_SetKeyCapture", &Script_SwitchControls_SetKeyCapture },
+    { "SwitchControls_ClearTextFocus", &Script_SwitchControls_ClearTextFocus },
     { "SwitchControls_Interact", &Script_SwitchControls_Interact },
 };
 
