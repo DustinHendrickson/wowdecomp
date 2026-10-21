@@ -104,6 +104,8 @@ void *OutputAudren::feederThread(void *param)
     OutputAudren *output = (OutputAudren *)param;
     AudioDriver  *driver = (AudioDriver *)output->mDriver;
 
+    wowdecomp_switch_thread_start(WOWDECOMP_THREAD_AUDIO);
+
     /*
         Keep every wave buffer queued: one that has played (or was never queued) is refilled from the ring and queued
         again. The renderer runs a frame every 5 ms; waiting for one keeps this loop in step with it.

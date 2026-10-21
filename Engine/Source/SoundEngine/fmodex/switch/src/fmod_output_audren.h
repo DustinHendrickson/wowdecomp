@@ -23,7 +23,7 @@ namespace FMOD
     {
       private:
 
-        enum { NUMHWBUFFERS = 4 };
+        enum { NUMHWBUFFERS = 3 };  /* queued ahead: fewer than FMOD's blocks, so the mixer refills a block before it plays again */
 
         void                       *mDriver;                      /* AudioDriver */
         void                       *mPool;                        /* the wave buffers' memory */

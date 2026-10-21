@@ -79,6 +79,7 @@ void PrepareConfig() {
 }
 
 void* ClientThread(void* param) {
+    wowdecomp_switch_thread_start(WOWDECOMP_THREAD_GAME);
     StormRtlInitialize();
     s_result = CommonMain();
     return nullptr;

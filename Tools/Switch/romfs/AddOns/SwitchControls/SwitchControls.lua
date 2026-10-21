@@ -75,11 +75,69 @@ end
 local frame = CreateFrame("Frame", "SwitchControlsFrame", UIParent)
 
 ---------------------------------------------------------------------------------------------------------------------
--- Hint bar: what the buttons do right now, along the top of the screen.
+-- Building blocks. Button icons are textures next to their labels, never |T escapes inside text: this client drops the
+-- text that follows an inline texture.
+
+local FONT = "Fonts\\FRIZQT__.TTF"
+local GOLD = { 1, 0.82, 0 }
+
+local function Label(parent, size, color)
+    local label = parent:CreateFontString(nil, "OVERLAY")
+    label:SetFont(FONT, size, "OUTLINE")
+    label:SetShadowOffset(1, -1)
+
+    if color then
+        label:SetTextColor(color[1], color[2], color[3])
+    end
+
+    return label
+end
+
+-- Icons for the given glyph names in a row from the left of the anchor; returns the row's width.
+local function Icons(parent, glyphs, size, anchor, x, y)
+    for i, name in ipairs(glyphs) do
+        local icon = parent:CreateTexture(nil, "OVERLAY")
+        icon:SetTexture(MEDIA .. name)
+        icon:SetWidth(size)
+        icon:SetHeight(size)
+        icon:SetPoint("LEFT", anchor, "LEFT", x + (i - 1) * (size - 2), y)
+    end
+
+    return #glyphs * (size - 2) + 2
+end
+
+-- A row of text and icons from the left of the anchor, at x: items are strings or { glyph }. Returns the new x.
+local function Sequence(parent, items, size, fontSize, color, anchor, x)
+    for _, item in ipairs(items) do
+        if type(item) == "table" then
+            x = x + Icons(parent, item, size, anchor, x, 0) + 4
+        else
+            local label = Label(parent, fontSize, color)
+            label:SetText(item)
+            label:SetPoint("LEFT", anchor, "LEFT", x, 0)
+            x = x + label:GetStringWidth() + 6
+        end
+    end
+
+    return x
+end
+
+local function Split(entry)
+    local glyphs = {}
+
+    for i = 1, #entry - 1 do
+        glyphs[i] = entry[i]
+    end
+
+    return glyphs, entry[#entry]
+end
+
+---------------------------------------------------------------------------------------------------------------------
+-- Hint bar: the mode and what the buttons do in it, along the top of the screen.
 
 local HINTS = {
     play = {
-        title = "Play",
+        title = "PLAY",
         { "LStick", "Move" },
         { "RStick", "Look" },
         { "B", "Jump" },
@@ -87,20 +145,20 @@ local HINTS = {
         { "Dpad", "Actions 4-7" },
         { "R", "Target" },
         { "Plus", "Menu" },
-        { "Minus", "Cursor mode" },
+        { "Minus", "Cursor" },
     },
     cursor = {
-        title = "Cursor",
+        title = "CURSOR",
         { "RStick", "Pointer" },
         { "A", "Click" },
         { "B", "Right-click" },
         { "DpadUp", "DpadDown", "Scroll" },
         { "Y", "Chat" },
-        { "Plus", "Close / Menu" },
-        { "Minus", "Play mode" },
+        { "Plus", "Close" },
+        { "Minus", "Play" },
     },
     text = {
-        title = "Typing",
+        title = "TYPING",
         { "A", "Enter" },
         { "B", "Cancel" },
         { "X", "Next field" },
@@ -109,50 +167,57 @@ local HINTS = {
     },
 }
 
-local function HintText(hints)
-    local parts = { "|cffffd100" .. hints.title .. "|r" }
-
-    for _, hint in ipairs(hints) do
-        local glyphs = ""
-
-        for i = 1, #hint - 1 do
-            glyphs = glyphs .. Glyph(hint[i])
-        end
-
-        table.insert(parts, glyphs .. " " .. hint[#hint])
-    end
-
-    -- How to get the full list, on every bar: hold Minus, or tap the bar.
-    table.insert(parts, "|cffaaaaaaHold|r " .. Glyph("Minus") .. " |cffaaaaaaor tap here: all controls|r")
-
-    return table.concat(parts, "    ")
-end
-
-local HINT_TEXT = {}
-
-for state, hints in pairs(HINTS) do
-    HINT_TEXT[state] = HintText(hints)
-end
+local HINT_ICON = 30
+local HINT_FONT = 16
 
 local hintBar = CreateFrame("Frame", "SwitchControlsHintBar", UIParent)
 hintBar:SetFrameStrata("HIGH")
-hintBar:SetHeight(28)
+hintBar:SetHeight(HINT_ICON + 14)
 hintBar:SetPoint("TOP", UIParent, "TOP", 0, -2)
 hintBar:SetBackdrop({
     bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
     tile = true,
     tileSize = 16,
-    edgeSize = 12,
-    insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    edgeSize = 14,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
 })
-hintBar:SetBackdropColor(0, 0, 0, 0.6)
-hintBar:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
+hintBar:SetBackdropColor(0.05, 0.05, 0.08, 0.85)
+hintBar:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.9)
+
 -- Tapping the bar (or clicking it in cursor mode) opens the controls list.
 hintBar:EnableMouse(true)
 
-local hintText = hintBar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-hintText:SetPoint("CENTER", hintBar, "CENTER", 0, 0)
+-- One row per state, built once; the bar shows one at a time and takes its width.
+local hintRows = {}
+
+for state, hints in pairs(HINTS) do
+    local row = CreateFrame("Frame", nil, hintBar)
+    row:SetAllPoints(hintBar)
+    row:Hide()
+
+    local x = 14
+    local title = Label(row, HINT_FONT + 1, GOLD)
+    title:SetText(hints.title)
+    title:SetPoint("LEFT", row, "LEFT", x, 0)
+    x = x + title:GetStringWidth() + 20
+
+    for _, hint in ipairs(hints) do
+        local glyphs, text = Split(hint)
+        x = x + Icons(row, glyphs, HINT_ICON, row, x, 0) + 4
+
+        local label = Label(row, HINT_FONT)
+        label:SetText(text)
+        label:SetPoint("LEFT", row, "LEFT", x, 0)
+        x = x + label:GetStringWidth() + 18
+    end
+
+    -- How to get the full list: hold Minus, or tap the bar.
+    x = Sequence(row, { "Hold", { "Minus" }, "or tap: all controls" }, HINT_ICON - 6, HINT_FONT - 2, { 0.7, 0.7, 0.7 }, row, x)
+
+    row.width = x + 8
+    hintRows[state] = row
+end
 
 local shownHints
 
@@ -161,47 +226,58 @@ local function ShowHints(state)
         return
     end
 
+    if shownHints then
+        hintRows[shownHints]:Hide()
+    end
+
     shownHints = state
-    hintText:SetText(HINT_TEXT[state])
-    hintBar:SetWidth(hintText:GetStringWidth() + 24)
+    hintRows[state]:Show()
+    hintBar:SetWidth(hintRows[state].width)
 end
 
 ---------------------------------------------------------------------------------------------------------------------
--- Help panel: every control, shown the first time in the world, with X in cursor mode, or /switch.
+-- Controls list: every control, in two columns. Opens the first time in the world, and on holding Minus, tapping the
+-- hint bar or X in cursor mode.
 
-local HELP = {
-    { title = "Play mode" },
-    { "LStick", "Move (forward, back, strafe)" },
-    { "RStick", "Turn the camera and your character" },
-    { "B", "Jump" },
-    { "A", "X", "Y", "Action buttons 1, 2, 3" },
-    { "DpadRight", "DpadUp", "DpadLeft", "DpadDown", "Action buttons 4, 5, 6, 7" },
-    { "L", "Action button 8" },
-    { "R", "Target the nearest enemy" },
-    { "ZL", "ZR", "Hold for Shift / Ctrl: more bindings" },
-    { "LStickClick", "Autorun" },
-    { title = "Cursor mode" },
-    { "RStick", "Move the pointer" },
-    { "A", "ZR", "Left click (hold to drag)" },
-    { "B", "ZL", "Right click" },
-    { "DpadUp", "DpadDown", "Scroll" },
-    { "Y", "Enter: open chat" },
-    { "X", "This list" },
-    { title = "Anywhere" },
-    { "Minus", "RStickClick", "Switch between play and cursor mode" },
-    { "Minus", "Hold: this list (open and close)" },
-    { "Plus", "Menu, close windows, clear target" },
-    { title = "Typing" },
-    { "A", "Enter (send)" },
-    { "B", "Cancel" },
-    { "X", "Next field" },
-    { "Y", "Open the keyboard again" },
+local HELP_COLUMNS = {
+    {
+        { title = "Play mode" },
+        { "LStick", "Move" },
+        { "RStick", "Turn camera and character" },
+        { "B", "Jump" },
+        { "A", "X", "Y", "Action buttons 1, 2, 3" },
+        { "Dpad", "Action buttons 4 to 7" },
+        { "L", "Action button 8" },
+        { "R", "Target nearest enemy" },
+        { "ZL", "ZR", "Hold: Shift / Ctrl bindings" },
+        { "LStickClick", "Autorun" },
+        { "Plus", "Menu, close, clear target" },
+    },
+    {
+        { title = "Cursor mode" },
+        { "RStick", "Move the pointer" },
+        { "A", "ZR", "Click (hold to drag)" },
+        { "B", "ZL", "Right-click" },
+        { "DpadUp", "DpadDown", "Scroll" },
+        { "Y", "Open chat" },
+        { title = "Switching" },
+        { "Minus", "Play / cursor mode" },
+        { "Minus", "Hold: this list" },
+        { title = "Typing" },
+        { "A", "Send", },
+        { "Y", "Keyboard again" },
+    },
 }
+
+local HELP_ICON = 32
+local HELP_FONT = 17
+local HELP_ROW = 38
+local HELP_COLUMN = 400
 
 local help = CreateFrame("Frame", "SwitchControlsHelp", UIParent)
 help:SetFrameStrata("DIALOG")
-help:SetWidth(470)
-help:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
+help:SetToplevel(true)
+help:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 help:SetBackdrop({
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -214,56 +290,60 @@ help:EnableMouse(true)
 help:Hide()
 table.insert(UISpecialFrames, "SwitchControlsHelp")
 
-local helpTitle = help:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-helpTitle:SetPoint("TOP", help, "TOP", 0, -20)
-helpTitle:SetText("Switch Controls")
-
-local helpClose = CreateFrame("Button", nil, help, "UIPanelCloseButton")
-helpClose:SetPoint("TOPRIGHT", help, "TOPRIGHT", -6, -6)
+local helpTitle = Label(help, 26, GOLD)
+helpTitle:SetText("Controller")
+helpTitle:SetPoint("TOP", help, "TOP", 0, -22)
 
 do
-    local y = -50
+    local rows = 0
 
-    for _, entry in ipairs(HELP) do
-        if entry.title then
-            y = y - 6
-            local title = help:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            title:SetPoint("TOPLEFT", help, "TOPLEFT", 26, y)
-            title:SetText(entry.title)
-            y = y - 20
-        else
-            local glyphs = ""
+    for column, entries in ipairs(HELP_COLUMNS) do
+        local x = 30 + (column - 1) * HELP_COLUMN
+        local y = -70
 
-            for i = 1, #entry - 1 do
-                glyphs = glyphs .. Glyph(entry[i], 20)
+        for _, entry in ipairs(entries) do
+            if entry.title then
+                local heading = Label(help, HELP_FONT + 2, GOLD)
+                heading:SetText(entry.title)
+                heading:SetPoint("TOPLEFT", help, "TOPLEFT", x, y - 6)
+                y = y - HELP_ROW
+            else
+                local glyphs, text = Split(entry)
+                local anchor = CreateFrame("Frame", nil, help)
+                anchor:SetWidth(1)
+                anchor:SetHeight(HELP_ICON)
+                anchor:SetPoint("TOPLEFT", help, "TOPLEFT", x, y)
+                Icons(help, glyphs, HELP_ICON, anchor, 0, 0)
+
+                local label = Label(help, HELP_FONT)
+                label:SetText(text)
+                label:SetPoint("LEFT", anchor, "LEFT", 3 * (HELP_ICON - 2) + 12, 0)
+                y = y - HELP_ROW
             end
-
-            local keys = help:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            keys:SetPoint("TOPLEFT", help, "TOPLEFT", 36, y)
-            keys:SetText(glyphs)
-
-            local text = help:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-            text:SetPoint("TOPLEFT", help, "TOPLEFT", 140, y - 3)
-            text:SetText(entry[#entry])
-            y = y - 22
         end
+
+        rows = math.max(rows, -y)
     end
 
-    local footer = help:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    footer:SetPoint("TOPLEFT", help, "TOPLEFT", 26, y - 8)
-    footer:SetText("Hold " .. Glyph("Minus", 14) .. " or tap the bar at the top of the screen to open this again.")
+    help:SetWidth(2 * HELP_COLUMN + 20)
 
-    -- Big enough to tap.
+    -- Closing, by controller or touch.
+    local closeAnchor = CreateFrame("Frame", nil, help)
+    closeAnchor:SetWidth(1)
+    closeAnchor:SetHeight(HELP_ICON)
+    closeAnchor:SetPoint("BOTTOMLEFT", help, "BOTTOMLEFT", 30, 26)
+    Sequence(help, { "Hold", { "Minus" }, "or press", { "Plus" }, "to close" }, HELP_ICON - 4, HELP_FONT - 1, { 0.75, 0.75, 0.75 }, closeAnchor, 0)
+
     local close = CreateFrame("Button", nil, help, "UIPanelButtonTemplate")
-    close:SetWidth(140)
-    close:SetHeight(30)
-    close:SetPoint("BOTTOM", help, "BOTTOM", 0, 18)
+    close:SetWidth(180)
+    close:SetHeight(40)
+    close:SetPoint("BOTTOMRIGHT", help, "BOTTOMRIGHT", -30, 22)
     close:SetText("Close")
     close:SetScript("OnClick", function()
         help:Hide()
     end)
 
-    help:SetHeight(-y + 84)
+    help:SetHeight(rows + 80)
 end
 
 local function ToggleHelp()

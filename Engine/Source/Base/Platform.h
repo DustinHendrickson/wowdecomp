@@ -73,6 +73,17 @@ static inline time_t wowdecomp_timegm(struct tm* parts) {
 
 #define timegm(parts) wowdecomp_timegm(parts)
 
+// Every thread the ports start calls this first, so it can run on all three application cores (libnx puts every thread
+// on one) at a priority for its role (Os/Switch/NxThreads.cpp).
+#define WOWDECOMP_THREAD_OTHER 0
+#define WOWDECOMP_THREAD_GAME 1
+#define WOWDECOMP_THREAD_AUDIO 2
+
+#if defined(__cplusplus)
+extern "C"
+#endif
+void wowdecomp_switch_thread_start(int role);
+
 // Thread names and Mach thread ports: neither exists on the Switch. The thread id is the pthread's, truncated.
 #define pthread_setname_np(...) 0
 static inline uint32_t pthread_mach_thread_np(pthread_t thread) {

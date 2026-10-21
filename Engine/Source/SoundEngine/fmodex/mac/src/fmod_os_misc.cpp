@@ -49,6 +49,7 @@ namespace
     {
         THREAD_RETURNTYPE (THREAD_CALLCONV *func)(void *param);
         void                               *param;
+        FMOD_THREAD_PRIORITY                priority;
         char                                name[64];
     };
 
@@ -56,6 +57,11 @@ namespace
     {
         MacThreadSignalStack signalStack;   /* So the game's crash handler can report a stack overflow here too. */
         ThreadStart *start = (ThreadStart *)param;
+
+#if defined(__SWITCH__)
+        /* The mixer and the stream feeders run high: on their own core, ahead of the game. */
+        wowdecomp_switch_thread_start(start->priority >= FMOD_THREAD_PRIORITY_HIGH ? WOWDECOMP_THREAD_AUDIO : WOWDECOMP_THREAD_OTHER);
+#endif
 
         if (start->name[0])
         {
@@ -222,8 +228,9 @@ FMOD_RESULT FMOD_OS_Thread_Create(const char *name, THREAD_RETURNTYPE (THREAD_CA
         return FMOD_ERR_MEMORY;
     }
 
-    start->func  = func;
-    start->param = param;
+    start->func     = func;
+    start->param    = param;
+    start->priority = priority;
 
     if (name)
     {

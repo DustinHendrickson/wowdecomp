@@ -61,6 +61,9 @@ void CreateExternalExitKey() {
 // taken first; this function holds its own reference until the exit is signaled.
 void* PosixThreadEntry(void* param) {
     MacThreadSignalStack signalStack;
+#if defined(__SWITCH__)
+    wowdecomp_switch_thread_start(WOWDECOMP_THREAD_OTHER);
+#endif
     Blizzard::Thread::ThreadRecord* thread = static_cast<Blizzard::Thread::ThreadRecord*>(param);
     void* handle = thread->m_handle;
 

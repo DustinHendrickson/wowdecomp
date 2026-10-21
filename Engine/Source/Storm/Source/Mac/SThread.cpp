@@ -39,6 +39,9 @@ const int32_t kThreadPriorityNormal = 0;
 
 void* PosixLaunch(void* param) {
     MacThreadSignalStack signalStack;
+#if defined(__SWITCH__)
+    wowdecomp_switch_thread_start(WOWDECOMP_THREAD_OTHER);
+#endif
     THREADLAUNCH* launch = static_cast<THREADLAUNCH*>(param);
     void* handle = launch->threadH;
 
