@@ -659,14 +659,26 @@ local function LoadOptions()
     end
 end
 
--- Interact starts on the right stick click (F17), unless that key or the action is bound already.
-local function BindInteract()
+-- Interact starts on the right stick click (F17), unless that key or the action is bound already. The binding set is 0
+-- (the defaults) until the saved bindings load, and saving then would replace them with the defaults: before
+-- VARIABLES_LOADED (bindingsLoaded) that waits, after it the defaults are what's in use, saved as account bindings.
+local function BindInteract(bindingsLoaded)
     if InCombatLockdown() or GetBindingKey("SWITCHCONTROLS_INTERACT") or GetBindingAction("F17") ~= "" then
         return
     end
 
+    local set = GetCurrentBindingSet()
+
+    if set ~= 1 and set ~= 2 then
+        if not bindingsLoaded then
+            return
+        end
+
+        set = 1
+    end
+
     if SetBinding("F17", "SWITCHCONTROLS_INTERACT") then
-        SaveBindings(GetCurrentBindingSet())
+        SaveBindings(set)
     end
 end
 
@@ -753,7 +765,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         if not entered then
             entered = true
             SetOverrideBindingClick(frame, false, "F19", "SwitchControlsHelpToggle")
-            BindInteract()
+            BindInteract(false)
 
             if not NeedsCursor() then
                 SwitchControls_SetMode("play")
@@ -772,7 +784,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         UpdateAllHotkeys()
     elseif event == "VARIABLES_LOADED" then
         -- Bindings can arrive after PLAYER_ENTERING_WORLD, replacing the ones set there.
-        BindInteract()
+        BindInteract(true)
     elseif event == "ADDON_LOADED" and arg1 == "Blizzard_BindingUI" then
         SetUpKeyBindings()
     elseif event == "PLAYER_LOGOUT" then
