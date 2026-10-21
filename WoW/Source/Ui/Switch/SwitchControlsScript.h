@@ -13,9 +13,14 @@
 //   SwitchControls_SetOption(name, on)                    Registry.txt as soon as they change; nil if never set
 //   SwitchControls_SetKeyCapture(on)                      the Key Bindings window is waiting for a key
 //   SwitchControls_ClearTextFocus()                       no text box has the focus: leave text mode
+//   SwitchControls_SetPointer(x, y)                       pointer to (x, y), fractions of the screen from bottom left
+//   changed = SwitchControls_DisplayChanged()             docking changed the render size: the device needs a restart
 //   interacted = SwitchControls_Interact()                right-click the nearest lootable body, NPC or usable object
 
 void SwitchControlsRegisterScriptFunctions();
+
+// After GlueXML loads: greys out the login screens' video options the Switch has no use for.
+void SwitchControlsSetUpGlue();
 void SwitchControlsUnregisterScriptFunctions();
 
 #endif

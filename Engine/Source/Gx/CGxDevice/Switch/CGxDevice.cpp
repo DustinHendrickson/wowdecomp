@@ -1,13 +1,13 @@
 // Nintendo Switch implementation of the adapter queries in Gx/CGxDevice/Win64/CGxDevice.cpp, and the Direct3D device
 // factories, which return nullptr: OpenGL (Mesa on the Tegra X1) is the only API.
 //
-// The screen is the game's window (Os/Switch/Input.cpp): 1280x720 handheld, 1920x1080 docked. Those are the monitor
-// modes, at 60 Hz, and the larger one only while docked.
+// The screen is the game's window (Os/Switch/Input.cpp): 1280x720 handheld, 1920x1080 docked. Both are always monitor
+// modes, at 60 Hz, so gxResolution keeps 1920x1080 while handheld (the format check would otherwise lower it): it then
+// renders at 1280x720, and at 1920x1080 again once docked (Os/Switch/Input.cpp RenderSize).
 
 #include <cstdint>
 #include "Engine/Source/Gx/CGxDevice/CGxDevice.h"
 #include "Engine/Source/Gx/Gx.h"
-#include "Engine/Source/Os/Mac/OsMacWindow.h"
 
 CGxDevice* CreateCGxDeviceD3d() {
     return nullptr;
@@ -50,12 +50,8 @@ int32_t CGxDevice::DeviceAdapterInfer(uint16_t& deviceID) {
 }
 
 int32_t CGxDevice::AdapterDesktopMode(CGxMonitorMode& mode) {
-    int32_t width;
-    int32_t height;
-    OsMacGetScreenSize(&width, &height);
-
-    mode.m_size.x = width;
-    mode.m_size.y = height;
+    mode.m_size.x = 1920;
+    mode.m_size.y = 1080;
     mode.m_refreshRate = 60;
     mode.m_bpp = 32;
 
@@ -67,16 +63,11 @@ int32_t CGxDevice::AdapterMonitorModes(TSGrowableArray<CGxMonitorMode>& modes) {
 
     modes.SetCount(0);
 
-    CGxMonitorMode desktop;
-    CGxDevice::AdapterDesktopMode(desktop);
-
     for (const C2iVector& size : s_sizes) {
-        if (size.x <= desktop.m_size.x && size.y <= desktop.m_size.y) {
-            CGxMonitorMode* mode = modes.New();
-            mode->m_size = size;
-            mode->m_bpp = 32;
-            mode->m_refreshRate = 60;
-        }
+        CGxMonitorMode* mode = modes.New();
+        mode->m_size = size;
+        mode->m_bpp = 32;
+        mode->m_refreshRate = 60;
     }
 
     return modes.Count() != 0;

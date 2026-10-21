@@ -14,6 +14,7 @@
 #include "Engine/Source/BlizzardCore/Source/System/Process/Mac/GameDirectory.h"
 #include "Engine/Source/Storm/H/storm.h"
 #include "WoW/Source/Client.h"
+#include "Engine/Source/Os/Switch/SwitchInput.h"
 #include "WoW/Source/Switch/NxMain.h"
 
 namespace {
@@ -23,11 +24,16 @@ int s_result;
 // The client's default resolutions are 4:3 (from its hardware table), and with widescreen on gxResolution only takes the
 // 16:9 sizes the Switch offers (Gx/CGxDevice/Switch), so a default size is refused and gxResolution is left empty, which
 // the glue screens can't parse. Before the client reads WTF/Config.wtf, a gxResolution that isn't a Switch size becomes
-// 1280x720, and a new config skips the hardware detection that would pick a 4:3 size again.
+// 1920x1080 (rendered at 1280x720 handheld, Os/Switch/Input.cpp RenderSize), and a new config skips the hardware
+// detection that would pick a 4:3 size again. Builds before docking could change the size wrote 1280x720 themselves;
+// that becomes 1920x1080 once too (the "resolutionFollowsDock" option records it), after which the player's choice holds.
 void PrepareConfig() {
     std::vector<std::string> lines;
     bool haveResolution = false;
     bool haveDetect = false;
+    bool changed = false;
+    bool migrated = false;
+    bool upgrade = !SwitchGetOption("resolutionFollowsDock", &migrated);
 
     if (FILE* file = fopen("WTF/Config.wtf", "r")) {
         char line[1024];
@@ -40,7 +46,10 @@ void PrepareConfig() {
             }
 
             if (!strncasecmp(text.c_str(), "SET gxResolution ", 17)) {
-                if (text.find("\"1280x720\"") == std::string::npos && text.find("\"1920x1080\"") == std::string::npos) {
+                bool large = text.find("\"1920x1080\"") != std::string::npos;
+
+                if (!large && (upgrade || text.find("\"1280x720\"") == std::string::npos)) {
+                    changed = true;
                     continue;
                 }
 
@@ -55,12 +64,16 @@ void PrepareConfig() {
         fclose(file);
     }
 
-    if (haveResolution && haveDetect) {
+    if (upgrade) {
+        SwitchSetOption("resolutionFollowsDock", true);
+    }
+
+    if (haveResolution && haveDetect && !changed) {
         return;
     }
 
     if (!haveResolution) {
-        lines.push_back("SET gxResolution \"1280x720\"");
+        lines.push_back("SET gxResolution \"1920x1080\"");
     }
 
     if (!haveDetect) {

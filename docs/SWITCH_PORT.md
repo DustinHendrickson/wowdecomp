@@ -107,10 +107,11 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 | Right stick | look (turns the camera and character, as right-drag) | Right stick | move the cursor |
 | B | jump (Space) | A or ZR | left click (hold to drag) |
 | A, X, Y | action keys 1, 2, 3 | B or ZL | right click |
-| D-pad right, up, left, down | action keys 4, 5, 6, 7 | D-pad up / down | mouse wheel |
+| D-pad right, up, left, down | action keys 4, 5, 6, 7 | D-pad | jump to the next button that way |
 | L (tap) | action key 8 | Y | Enter (opens chat) |
 | L (hold) + right stick up / down | zoom the camera | | |
 | R | Tab (next enemy) | X | the controls list |
+| | | R (hold) + right stick up / down | scroll (mouse wheel); R alone is Tab |
 | ZR (hold) + R | Ctrl+Tab (nearest friend) | | |
 | Right stick click | interact: loot the nearest body, talk to an NPC, use an object | Right stick click | interact |
 | ZL, ZR (hold) | Shift, Ctrl, for more bindings | | |
@@ -138,9 +139,16 @@ start, so it always matches the build):
   dims after a few seconds and comes back when the mode changes. Tapping it opens the controls list.
 - Action buttons are labeled with the controller buttons that press them (A, ZL+X, D-pad, ...) instead of key names.
   Keys no controller button sends keep their usual labels.
-- The controls list has three options: **Hint bar** on / off, **Invert camera** (the right stick's up and down; the
-  game's own mouse invert doesn't reach the stick), and **Back to play** (on: closing a window that brought the cursor
-  returns to play mode; off: the cursor stays until Minus). All are saved in `Registry.txt` the moment they change, so they
+- In cursor mode the D-pad jumps the pointer to the nearest button in that direction, inside the open windows (anywhere
+  on screen with none open), for A to press: menus work without steering the pointer. Hold R and push the right stick
+  up or down to scroll lists.
+- Auto loot starts on (once; the setting is then yours in Interface options): interacting with a body takes everything.
+  Hold ZL (Shift) while interacting to open the loot window instead.
+- The controls list has five options: **Hint bar** on / off, **Invert camera** (the right stick's up and down; the
+  game's own mouse invert doesn't reach the stick), **Back to play** (on: closing a window that brought the cursor
+  returns to play mode; off: the cursor stays until Minus), **Handheld UI size** (on by default: the UI is 15% larger
+  undocked and normal docked, switching as you dock; changing the UI scale in the video options turns it off) and
+  **Battery saver** (off by default: undocked, the game presents every other refresh, a steady 30 fps). All are saved in `Registry.txt` the moment they change, so they
   survive closing the game from the HOME menu (the add-on's saved variables are written only on a clean logout).
 - A controls list opens the first time you enter the world. Hold **Minus**, tap the hint bar, or press **X** in cursor
   mode to open it again; the same, **Plus**, or its Close button closes it. (`/switch hints` turns the hint bar off and
@@ -166,8 +174,10 @@ by itself; OK, then **A** (Enter) logs in.
   crash logs (`Errors/` next to `WoW.nro`) and nxlink output.
 - Video options: the first time in the world the effects are set to Blizzard's **Fair** preset, a good fit for the
   Tegra X1 at 720p; later changes are kept. Options that do nothing on the Switch (windowed mode, maximized, window
-  lock, triple buffering, hardware cursor, fix input lag, gamma) are greyed out. Resolutions are 1280x720, plus
-  1920x1080 while docked, at 60 Hz; vertical sync is on by default. The CPU (three A57 cores at 1785 MHz) is likely the
+  lock, triple buffering, hardware cursor, fix input lag, gamma) are greyed out, on the login screens too. Resolutions
+  are 1280x720 and 1920x1080, at 60 Hz; vertical sync is on by default. The default, 1920x1080, renders at 1280x720
+  handheld and switches to 1920x1080 when docked (in the world, the graphics restart a moment after docking or
+  undocking); choosing 1280x720 keeps 720p docked too. The CPU (three A57 cores at 1785 MHz) is likely the
   limit in cities.
 
 ## Risks and next steps

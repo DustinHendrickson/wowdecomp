@@ -12,6 +12,7 @@
 #include "Engine/Source/Gx/CGxDeviceOpenGL/Switch/GlSwitch.h"
 #include "Engine/Source/Gx/CGxFormat.h"
 #include "Engine/Source/Gx/CGxGammaRamp.h"
+#include "Engine/Source/Os/Switch/SwitchInput.h"
 
 namespace {
 
@@ -19,6 +20,8 @@ struct SwitchGlContext {
     EGLDisplay m_display;
     EGLSurface m_surface;
     EGLContext m_context;
+    int32_t m_requestedInterval;   // the game's vertical sync
+    int32_t m_interval;            // as applied, after the battery saver (SwitchFrameInterval)
 };
 
 SwitchGlContext* s_current;
@@ -113,6 +116,8 @@ void* MacGlCreateContext(void* view, const CGxFormat& format) {
     result->m_display = display;
     result->m_surface = surface;
     result->m_context = context;
+    result->m_requestedInterval = 1;
+    result->m_interval = -1;
     s_current = result;
 
     return result;
@@ -141,7 +146,9 @@ void MacGlSetSwapInterval(void* handle, int32_t interval) {
     SwitchGlContext* context = static_cast<SwitchGlContext*>(handle);
 
     if (context) {
-        eglSwapInterval(context->m_display, interval);
+        context->m_requestedInterval = interval;
+        context->m_interval = SwitchFrameInterval(interval);
+        eglSwapInterval(context->m_display, context->m_interval);
     }
 }
 
@@ -180,9 +187,19 @@ void* SwitchGlCurrentContext() {
 }
 
 void SwitchGlSwapBuffers() {
-    if (s_current) {
-        eglSwapBuffers(s_current->m_display, s_current->m_surface);
+    if (!s_current) {
+        return;
     }
+
+    // The battery saver follows docking and the option as they change.
+    int32_t interval = SwitchFrameInterval(s_current->m_requestedInterval);
+
+    if (interval != s_current->m_interval) {
+        s_current->m_interval = interval;
+        eglSwapInterval(s_current->m_display, interval);
+    }
+
+    eglSwapBuffers(s_current->m_display, s_current->m_surface);
 }
 
 void* SwitchGlGetProcAddress(const char* name) {

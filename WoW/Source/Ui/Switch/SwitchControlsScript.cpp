@@ -155,6 +155,16 @@ int32_t Script_SwitchControls_GetOption(lua_State* L) {
     return 1;
 }
 
+int32_t Script_SwitchControls_DisplayChanged(lua_State* L) {
+    lua_pushboolean(L, SwitchDisplayChanged());
+    return 1;
+}
+
+int32_t Script_SwitchControls_SetPointer(lua_State* L) {
+    SwitchSetPointer(static_cast<float>(lua_tonumber(L, 1)), static_cast<float>(lua_tonumber(L, 2)));
+    return 0;
+}
+
 int32_t Script_SwitchControls_ClearTextFocus(lua_State* L) {
     SwitchClearTextFocus();
     return 0;
@@ -219,9 +229,56 @@ const struct {
     { "SwitchControls_SetOption", &Script_SwitchControls_SetOption },
     { "SwitchControls_SetKeyCapture", &Script_SwitchControls_SetKeyCapture },
     { "SwitchControls_ClearTextFocus", &Script_SwitchControls_ClearTextFocus },
+    { "SwitchControls_SetPointer", &Script_SwitchControls_SetPointer },
+    { "SwitchControls_DisplayChanged", &Script_SwitchControls_DisplayChanged },
     { "SwitchControls_Interact", &Script_SwitchControls_Interact },
 };
 
+// The login screens' video options (GlueXML, where add-ons don't load) get what the SwitchControls add-on does to the
+// world's: the controls the Switch has no use for (windowed and maximized, the window lock, triple buffering, the
+// hardware cursor, input lag, gamma) are greyed out and stay so when the panel enables others.
+const char kGlueVideoOptionsScript[] = R"lua(
+local panel = "VideoOptionsResolutionPanel"
+local disable = BlizzardOptionsPanel_CheckButton_Disable or function(box) box:Disable() end
+local unused = {}
+
+for _, name in ipairs({ "TripleBuffer", "HardwareCursor", "FixInputLag", "Windowed", "Maximized", "DisableResize", "DesktopGamma" }) do
+    local box = _G[panel .. name]
+
+    if box then
+        unused[box] = true
+        disable(box)
+        box.Enable = function() end
+    end
+end
+
+if BlizzardOptionsPanel_CheckButton_Enable then
+    hooksecurefunc("BlizzardOptionsPanel_CheckButton_Enable", function(box)
+        if unused[box] then
+            disable(box)
+        end
+    end)
+end
+
+local function DisableGamma()
+    local slider = _G[panel .. "GammaSlider"]
+
+    if slider and BlizzardOptionsPanel_Slider_Disable then
+        BlizzardOptionsPanel_Slider_Disable(slider)
+    end
+end
+
+if VideoOptionsResolutionPanel_RefreshGammaControls then
+    hooksecurefunc("VideoOptionsResolutionPanel_RefreshGammaControls", DisableGamma)
+end
+
+DisableGamma()
+)lua";
+
+}
+
+void SwitchControlsSetUpGlue() {
+    FrameScript_Execute(kGlueVideoOptionsScript, "SwitchGlueVideoOptions", nullptr);
 }
 
 void SwitchControlsRegisterScriptFunctions() {

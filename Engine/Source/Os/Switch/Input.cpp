@@ -24,14 +24,14 @@
 //   Right stick  look (right-drag)     Right stick  move the cursor
 //   B            jump (Space)          A / ZR       left click (hold to drag)
 //   A X Y        1 2 3                 B / ZL       right click
-//   D-pad        4 5 6 7 (> ^ < v)     D-pad ^ v    mouse wheel
+//   D-pad        4 5 6 7 (> ^ < v)     D-pad        F14 ^ F15 v F16 < F18 > (the add-on jumps to the next button)
 //   L R          8, Tab (target)       Y            Enter (open chat)
 //   L (hold) + right stick up / down: zoom the camera (the mouse wheel); L alone is 8, sent on release
 //   ZL ZR (hold) Shift, Ctrl           X            F19 (the SwitchControls add-on's controls list)
+//                                      R (hold) + right stick up / down: the mouse wheel (scroll); R alone is Tab
 //
 //   Clicking the right stick interacts (F17: the SwitchControls add-on right-clicks the nearest lootable body, NPC or
-//   usable object). ZR (Ctrl) + R (Tab) targets the nearest
-//   friend, the default Ctrl+Tab binding.
+//   usable object). ZR (Ctrl) + R (Tab) targets the nearest friend, the default Ctrl+Tab binding.
 //
 //   While a row of the Key Bindings window waits for a key, the buttons send their play mode keys even in cursor mode
 //   and the left stick sends nothing, so any button, with ZL / ZR held for Shift / Ctrl, can be bound.
@@ -89,6 +89,10 @@ bool s_keyDown[KEY_LAST];
 void* s_window;
 int32_t s_contentWidth;
 int32_t s_contentHeight;
+
+// The size the game last asked for (gxResolution), from which the render size follows the docking (RenderSize).
+int32_t s_requestedWidth;
+int32_t s_requestedHeight;
 OsMacWindowListener s_listener;
 void* s_listenerParam;
 
@@ -147,6 +151,7 @@ enum OutputType {
     Output_MinusHold,
     Output_Keyboard,
     Output_LHold,
+    Output_RHold,
 };
 
 struct Output {
@@ -167,9 +172,19 @@ bool s_lHeld;
 bool s_lUsed;
 float s_zoomRemainder;
 
+// R in cursor mode: a tap is Tab; held, the right stick scrolls (the mouse wheel) where the pointer is.
+const float kScrollNotchesPerSecond = 12.0f;
+bool s_rHeld;
+bool s_rUsed;
+float s_scrollRemainder;
+
 // Up on the right stick looks down when set (the SwitchControls add-on's "Invert camera"). The controller's own
 // setting: the game's mouseInvertPitch doesn't reach the stick.
 bool s_invertLook;
+
+// Battery saver (the SwitchControls add-on's option): undocked, frames go out every other display refresh, a steady
+// 30 fps (SwitchFrameInterval, for the GL swap).
+bool s_batterySaver;
 
 // Controller options live in Registry.txt, written the moment they change. The add-on's saved variables are written only
 // on a clean logout or quit, which closing the game from the HOME menu skips.
@@ -607,7 +622,12 @@ Output Mapping(uint64_t button) {
             output.type = Output_LHold;
             return output;
         case NxButton_R:
-            key(KEY_TAB);
+            if (s_cursorMode && !s_keyCapture && !TextMode()) {
+                output.type = Output_RHold;
+            } else {
+                key(KEY_TAB);
+            }
+
             return output;
         default:
             break;
@@ -646,13 +666,18 @@ Output Mapping(uint64_t button) {
                 // The SwitchControls add-on binds F19 to its controls list.
                 key(KEY_F19);
                 return output;
+            // The SwitchControls add-on binds these to jumping the pointer to the next button that way.
             case NxButton_Up:
-                output.type = Output_Wheel;
-                output.value = 1;
+                key(KEY_F14);
                 return output;
             case NxButton_Down:
-                output.type = Output_Wheel;
-                output.value = -1;
+                key(KEY_F15);
+                return output;
+            case NxButton_Left:
+                key(KEY_F16);
+                return output;
+            case NxButton_Right:
+                key(KEY_F18);
                 return output;
             default:
                 return output;
@@ -707,6 +732,11 @@ void PressOutput(const Output& output) {
             s_lUsed = false;
             s_zoomRemainder = 0.0f;
             break;
+        case Output_RHold:
+            s_rHeld = true;
+            s_rUsed = false;
+            s_scrollRemainder = 0.0f;
+            break;
         default:
             break;
     }
@@ -727,6 +757,14 @@ void ReleaseOutput(const Output& output) {
             }
 
             s_lHeld = false;
+            break;
+        case Output_RHold:
+            // A tap is Tab; held with the right stick it scrolled instead.
+            if (s_rHeld && !s_rUsed) {
+                TapKey(KEY_TAB);
+            }
+
+            s_rHeld = false;
             break;
         case Output_MinusHold:
             // A short press switches modes; a long one already opened the controls list.
@@ -826,6 +864,22 @@ void PollRightStick(const NxStick& stick, float seconds) {
         // Past the deadzone, response grows with the square of the deflection for fine aiming near the center.
         float amount = (magnitude - kStickDeadzone) / (1.0f - kStickDeadzone);
         scale = amount * amount / magnitude;
+    }
+
+    // Holding R in cursor mode, up and down scroll where the pointer is, as the mouse wheel does.
+    if (s_rHeld && s_cursorMode && !TextMode()) {
+        if (active && std::fabs(stick.y) > std::fabs(stick.x)) {
+            s_rUsed = true;
+            s_scrollRemainder += stick.y * scale * magnitude * kScrollNotchesPerSecond * seconds;
+            int32_t notches = static_cast<int32_t>(s_scrollRemainder);
+
+            if (notches) {
+                s_scrollRemainder -= notches;
+                PutWheel(notches);
+            }
+        }
+
+        return;
     }
 
     // Holding L, up and down zoom the camera, as the mouse wheel does, over the world in the middle of the screen.
@@ -1041,6 +1095,7 @@ void Poll() {
     if (!s_optionsLoaded) {
         s_optionsLoaded = true;
         SwitchGetOption("invertLook", &s_invertLook);
+        SwitchGetOption("batterySaver", &s_batterySaver);
     }
 
     uint64_t now = OsGetAsyncTimeMs();
@@ -1122,6 +1177,8 @@ void RenderSize(int32_t width, int32_t height, int32_t* renderWidth, int32_t* re
 void* OsMacCreateGameWindow(const char* title, int32_t x, int32_t y, int32_t width, int32_t height) {
     NxInputInitialize();
 
+    s_requestedWidth = width;
+    s_requestedHeight = height;
     RenderSize(width, height, &s_contentWidth, &s_contentHeight);
     s_window = NxInputGetWindow(s_contentWidth, s_contentHeight);
     s_windowSize = 1;
@@ -1175,6 +1232,8 @@ void OsMacGetContentScreenOrigin(void* window, int32_t* x, int32_t* y) {
 void OsMacSetWindowFullscreen(void* window, bool fullscreen, int32_t width, int32_t height) {
     // Windowed or not, the game fills the screen at one of the two render sizes (the GL surface is created after this,
     // so the size can still change).
+    s_requestedWidth = width;
+    s_requestedHeight = height;
     RenderSize(width, height, &width, &height);
 
     if (width != s_contentWidth || height != s_contentHeight) {
@@ -1196,19 +1255,23 @@ bool OsMacCursorHidden() {
 }
 
 void OsMacGetScreenSize(int32_t* width, int32_t* height) {
-    // Decided once: the window keeps its size if the console is docked or undocked later; the system scales it.
-    static int32_t s_width;
-    static int32_t s_height;
+    // The screen as it is now: 1920x1080 docked, 1280x720 handheld. The window keeps its size until the device is
+    // restarted (SwitchDisplayChanged), and the system scales it meanwhile.
+    NxInputInitialize();
+    bool docked = NxInputIsDocked();
+    *width = docked ? 1920 : 1280;
+    *height = docked ? 1080 : 720;
+}
 
-    if (!s_width) {
-        NxInputInitialize();
-        bool docked = NxInputIsDocked();
-        s_width = docked ? 1920 : 1280;
-        s_height = docked ? 1080 : 720;
+bool SwitchDisplayChanged() {
+    if (!s_window || !s_requestedWidth) {
+        return false;
     }
 
-    *width = s_width;
-    *height = s_height;
+    int32_t width;
+    int32_t height;
+    RenderSize(s_requestedWidth, s_requestedHeight, &width, &height);
+    return width != s_contentWidth || height != s_contentHeight;
 }
 
 void OsMacInitializeApplication() {
@@ -1473,6 +1536,8 @@ bool SwitchGetOption(const char* name, bool* value) {
 void SwitchSetOption(const char* name, bool value) {
     if (!strcmp(name, "invertLook")) {
         s_invertLook = value;
+    } else if (!strcmp(name, "batterySaver")) {
+        s_batterySaver = value;
     }
 
     bool stored;
@@ -1480,6 +1545,26 @@ void SwitchSetOption(const char* name, bool value) {
     if (!SwitchGetOption(name, &stored) || stored != value) {
         SRegSaveValue(kOptionsKey, name, 0, value ? 1 : 0);
     }
+}
+
+int32_t SwitchFrameInterval(int32_t requested) {
+    if (s_batterySaver && !NxInputIsDocked()) {
+        return 2;
+    }
+
+    return requested;
+}
+
+void SwitchSetPointer(float x, float y) {
+    if (!s_cursorMode) {
+        return;
+    }
+
+    C2iVector point;
+    point.x = static_cast<int32_t>(x * s_contentWidth + 0.5f);
+    point.y = static_cast<int32_t>((1.0f - y) * s_contentHeight + 0.5f);
+    ClampToContent(point);
+    MoveMouseTo(point);
 }
 
 void SwitchSetKeyCapture(bool capture) {

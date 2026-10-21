@@ -39,6 +39,9 @@
 #include "Engine/Source/Tempest/CRect.h"
 #include "WoW/Source/Client.h"
 #include "WoW/Source/DB/DBClient/DBClient.h"
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+#include "WoW/Source/Ui/Switch/SwitchControlsScript.h"
+#endif
 #include "WoW/Source/DB/Rec/ChrClassesRec.h"
 #include "WoW/Source/DB/Rec/ChrRacesRec.h"
 #include "WoW/Source/DB/Rec/GameTipsRec.h"
@@ -759,6 +762,9 @@ void CGlueMgr::Resume() {
 #endif
 
             FrameScript_SignalEvent(GLUE_EVENT_FRAMES_LOADED, nullptr);
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+            SwitchControlsSetUpGlue();
+#endif
             CGlueMgr::InitializeFFX();
 
             ClientServices::SetMessageHandler(SMSG_CHARACTER_RENAME_RESULT, CGlueMgr::OnCharRenameResult, nullptr);

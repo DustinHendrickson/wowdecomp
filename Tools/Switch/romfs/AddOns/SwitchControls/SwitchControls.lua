@@ -174,10 +174,10 @@ local HINTS = {
     },
     cursor = {
         title = "CURSOR",
-        { "RStick", "Pointer" },
+        { "Dpad", "Select" },
         { "A", "Click" },
         { "B", "Right-click" },
-        { "Y", "Chat" },
+        { "R", "RStick", "Scroll" },
         { "Minus", "Play" },
     },
     bind = {
@@ -303,10 +303,11 @@ local HELP_COLUMNS = {
     },
     {
         { title = "Cursor mode" },
+        { "Dpad", "Jump to the next button" },
         { "RStick", "Move the pointer" },
         { "A", "ZR", "Click (hold to drag)" },
         { "B", "ZL", "Right-click" },
-        { "DpadUp", "DpadDown", "Scroll" },
+        { "R", "RStick", "Hold R: scroll" },
         { "Y", "Open chat" },
         { title = "Switching" },
         { "Minus", "Play / cursor mode" },
@@ -385,11 +386,11 @@ do
     Sequence(help, { "Hold", { "Minus" }, "or press", { "Plus" }, "to close" }, HELP_ICON - 4, "hint", closeAnchor, 0)
 
     -- Options, big enough to tap.
-    local function Toggle(key, text, x)
+    local function Toggle(key, text, x, y)
         local button = CreateFrame("Button", nil, help, "UIPanelButtonTemplate")
         button:SetWidth(200)
         button:SetHeight(40)
-        button:SetPoint("BOTTOMLEFT", help, "BOTTOMLEFT", x, 70)
+        button:SetPoint("BOTTOMLEFT", help, "BOTTOMLEFT", x, y)
 
         local function Refresh()
             button:SetText(text .. ": " .. (SwitchControlsDB and SwitchControlsDB[key] and "On" or "Off"))
@@ -405,9 +406,11 @@ do
         Refresh()
     end
 
-    Toggle("hints", "Hint bar", 30)
-    Toggle("invertLook", "Invert camera", 245)
-    Toggle("returnToPlay", "Back to play", 460)
+    Toggle("hints", "Hint bar", 30, 116)
+    Toggle("invertLook", "Invert camera", 245, 116)
+    Toggle("returnToPlay", "Back to play", 460, 116)
+    Toggle("autoUiScale", "Handheld UI size", 30, 70)
+    Toggle("batterySaver", "Battery saver", 245, 70)
 
     local close = CreateFrame("Button", nil, help, "UIPanelButtonTemplate")
     close:SetWidth(180)
@@ -418,7 +421,13 @@ do
         help:Hide()
     end)
 
-    help:SetHeight(rows + 130)
+    help:SetHeight(rows + 176)
+
+    -- As large as fits: the screen's height in UI units shrinks as the UI scale grows (handheld).
+    help:SetScript("OnShow", function(self)
+        local fit = (UIParent:GetHeight() - 20) / self:GetHeight()
+        self:SetScale(math.min(HELP_SCALE, fit))
+    end)
 end
 
 local function ToggleHelp()
@@ -599,6 +608,84 @@ local function UpdateCursor(mode)
 end
 
 ---------------------------------------------------------------------------------------------------------------------
+-- D-pad navigation in cursor mode: the D-pad sends F14 up, F15 down, F16 left, F18 right (Os/Switch/Input.cpp), and the
+-- pointer jumps to the nearest button that way, in the open windows (or anywhere on screen when none is open), for A
+-- to press. Nearest counts distance across the direction twice, so buttons in line win over ones off to the side.
+
+local NAV_DIRECTIONS = { F14 = "up", F15 = "down", F16 = "left", F18 = "right" }
+
+local NAVIGABLE = { Button = true, CheckButton = true, EditBox = true }
+
+local function InOpenWindow(target, open)
+    while target do
+        if open[target] then
+            return true
+        end
+
+        target = target:GetParent()
+    end
+
+    return false
+end
+
+local function Navigate(direction)
+    local open, count = OpenWindows()
+    local cursorX, cursorY = GetCursorPosition()
+    local best, bestX, bestY, bestScore
+
+    local target = EnumerateFrames()
+
+    while target do
+        if NAVIGABLE[target:GetObjectType()] and target:IsVisible() and target:IsMouseEnabled() and target:GetWidth() > 6
+            and target:GetHeight() > 6 and (count == 0 or InOpenWindow(target, open)) then
+            local x, y = target:GetCenter()
+
+            if x then
+                local scale = target:GetEffectiveScale()
+                x, y = x * scale, y * scale
+                local dx, dy = x - cursorX, y - cursorY
+                local along, across
+
+                if direction == "up" then
+                    along, across = dy, dx
+                elseif direction == "down" then
+                    along, across = -dy, dx
+                elseif direction == "right" then
+                    along, across = dx, dy
+                else
+                    along, across = -dx, dy
+                end
+
+                if along > 4 then
+                    local score = along + 2 * math.abs(across)
+
+                    if not bestScore or score < bestScore then
+                        best, bestX, bestY, bestScore = target, x, y, score
+                    end
+                end
+            end
+        end
+
+        target = EnumerateFrames(target)
+    end
+
+    if best then
+        local scale = UIParent:GetEffectiveScale()
+        SwitchControls_SetPointer(bestX / (UIParent:GetWidth() * scale), bestY / (UIParent:GetHeight() * scale))
+    end
+end
+
+local navButtons = {}
+
+for key, direction in pairs(NAV_DIRECTIONS) do
+    local button = CreateFrame("Button", "SwitchControlsNav" .. key, UIParent)
+    button:SetScript("OnClick", function()
+        Navigate(direction)
+    end)
+    navButtons[key] = button
+end
+
+---------------------------------------------------------------------------------------------------------------------
 -- Action button labels: the controller buttons in place of the key names.
 
 local function UpdateHotkey(button, actionButtonType)
@@ -710,6 +797,8 @@ local OPTION_DEFAULTS = {
     hints = true,
     invertLook = false,
     returnToPlay = true,
+    autoUiScale = true,
+    batterySaver = false,
 }
 
 local function LoadOptions()
@@ -853,6 +942,12 @@ local function SetUpKeyBindings()
     local onKeyDown = KeyBindingFrame:GetScript("OnKeyDown")
 
     KeyBindingFrame:SetScript("OnKeyDown", function(self, key)
+        -- The window takes the keyboard, so the D-pad's navigation keys come here rather than to their bindings.
+        if not self.selected and NAV_DIRECTIONS[key] then
+            Navigate(NAV_DIRECTIONS[key])
+            return
+        end
+
         if self.selected and (key == "ESCAPE" or key == "F19") then
             if self.buttonPressed then
                 self.buttonPressed:UnlockHighlight()
@@ -868,6 +963,85 @@ local function SetUpKeyBindings()
         onKeyDown(self, key)
     end)
 end
+
+---------------------------------------------------------------------------------------------------------------------
+-- Auto loot starts on, once (the setting is then the player's): looting a body takes everything; holding ZL (Shift)
+-- while interacting opens the loot window instead.
+
+local function EnableAutoLoot()
+    if SwitchControls_GetOption("autoLootSet") == nil then
+        SetCVar("autoLootDefault", "1")
+        SwitchControls_SetOption("autoLootSet", true)
+    end
+end
+
+---------------------------------------------------------------------------------------------------------------------
+-- UI size: the "Handheld UI size" option makes the UI larger undocked, where the screen is small and close, and normal
+-- docked, following the console as it docks and undocks. On top of the game's own UI scale, so the video options still
+-- set the base; changing the scale there turns the option off. Not in combat, where protected frames can't be scaled.
+
+local HANDHELD_UI_SCALE = 1.15
+
+local uiScaleCVars
+local baseUiScale
+local appliedUiScale
+
+local function UpdateUIScale()
+    if not SwitchControlsDB or InCombatLockdown() then
+        return
+    end
+
+    local cvars = GetCVar("useUiScale") .. " " .. GetCVar("uiScale")
+
+    if uiScaleCVars and cvars ~= uiScaleCVars and SwitchControlsDB.autoUiScale then
+        Log("UI scale changed in the video options: handheld UI size off")
+        SwitchControlsDB.autoUiScale = false
+        SwitchControls_SetOption("autoUiScale", false)
+    end
+
+    uiScaleCVars = cvars
+
+    -- The game's own scale: the first time, and whenever the game has set it since (its settings changed).
+    local current = UIParent:GetScale()
+
+    if not appliedUiScale or math.abs(current - appliedUiScale) > 0.001 then
+        baseUiScale = current
+    end
+
+    local scale = baseUiScale
+
+    if SwitchControlsDB.autoUiScale and not SwitchControls_IsDocked() then
+        scale = scale * HANDHELD_UI_SCALE
+    end
+
+    if math.abs(current - scale) > 0.001 then
+        UIParent:SetScale(scale)
+    end
+
+    appliedUiScale = scale
+end
+
+local uiScaleFrame = CreateFrame("Frame")
+local uiScaleElapsed = 0
+
+-- Docking or undocking changes the render size of a 1920x1080 resolution (1280x720 handheld): the device restarts at
+-- the new size, out of combat.
+local function UpdateDisplay()
+    if SwitchControls_DisplayChanged and SwitchControls_DisplayChanged() and not InCombatLockdown() then
+        Log("docking changed the render size: restarting graphics")
+        RestartGx()
+    end
+end
+
+uiScaleFrame:SetScript("OnUpdate", function(self, elapsed)
+    uiScaleElapsed = uiScaleElapsed + elapsed
+
+    if uiScaleElapsed >= 0.5 then
+        uiScaleElapsed = 0
+        Step("display", UpdateDisplay)
+        Step("UI scale", UpdateUIScale)
+    end
+end)
 
 ---------------------------------------------------------------------------------------------------------------------
 -- Video options (FrameXML's VideoOptionsPanels): the controls the Switch has no use for are greyed out, since the game
@@ -968,6 +1142,12 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             -- Each step on its own, so one failing (an error is logged) doesn't keep the others, play mode above all,
             -- from happening.
             Step("help binding", SetOverrideBindingClick, frame, false, "F19", "SwitchControlsHelpToggle")
+
+            for key in pairs(NAV_DIRECTIONS) do
+                Step("navigation binding", SetOverrideBindingClick, frame, false, key, "SwitchControlsNav" .. key)
+            end
+
+            Step("auto loot", EnableAutoLoot)
             CheckBindings()
             Step("video options", SetUpVideoOptions)
             Step("video preset", ApplySwitchVideoPreset)

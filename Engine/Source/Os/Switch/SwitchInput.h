@@ -38,6 +38,18 @@ bool SwitchIsDocked();
 bool SwitchGetOption(const char* name, bool* value);
 void SwitchSetOption(const char* name, bool value);
 
+// The swap interval to present frames with, given the one the game asks for (its vertical sync setting): every other
+// refresh (30 fps) undocked with the battery saver on.
+int32_t SwitchFrameInterval(int32_t requested);
+
+// The render size the game's resolution gives has changed with docking (1920x1080 renders at 1280x720 handheld): the
+// device needs restarting (the SwitchControls add-on calls RestartGx).
+bool SwitchDisplayChanged();
+
+// Moves the pointer in cursor mode, to a point given as fractions of the screen from its bottom left (UI coordinates
+// over the screen's size): the SwitchControls add-on's D-pad navigation.
+void SwitchSetPointer(float x, float y);
+
 // The Key Bindings window is waiting for a key: controller buttons send keys rather than clicks.
 void SwitchSetKeyCapture(bool capture);
 
