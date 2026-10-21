@@ -85,8 +85,8 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 
 - **USB keyboard and mouse** (docked) work as on a computer.
 - **Touch screen**: tap to left-click, drag to left-drag, touch and hold for half a second to right-click.
-- **Controller** (handheld, Joy-Cons, Pro Controller), in two modes. **Minus** or clicking the **right stick**
-  switches between them. The login and character screens start in cursor mode; entering the world switches to play
+- **Controller** (handheld, Joy-Cons, Pro Controller), in two modes. A short press of **Minus** or clicking the
+  **right stick** switches between them; **holding Minus** opens and closes the controls list. The login and character screens start in cursor mode; entering the world switches to play
   mode, and opening a menu or window (game menu, bags, character, spellbook, loot, popups, ...) switches to cursor mode
   until it closes. Going back to play mode with a window open keeps play mode until the windows close.
 
@@ -109,11 +109,13 @@ Key Bindings.
 **On screen** (the built-in SwitchControls add-on, packed in `WoW.nro` and installed into `Interface/AddOns` at every
 start, so it always matches the build):
 
-- A hint bar at the top of the screen shows what the buttons do right now: play mode, cursor mode, or typing.
+- A hint bar at the top of the screen names the mode (play, cursor, typing) and shows what the buttons do in it.
+  Tapping it opens the controls list.
 - Action buttons are labeled with the controller buttons that press them (A, ZL+X, D-pad, ...) instead of key names.
   Keys no controller button sends keep their usual labels.
-- A controls list opens the first time you enter the world; **X** in cursor mode or `/switch` opens it again.
-  `/switch hints` turns the hint bar off and on.
+- A controls list opens the first time you enter the world. Hold **Minus**, tap the hint bar, or press **X** in cursor
+  mode to open it again; the same, **Plus**, or its Close button closes it. (`/switch hints` turns the hint bar off and
+  on, for a USB keyboard.)
 
 The add-on's sources are `Tools/Switch/romfs/AddOns/SwitchControls`; `Tools/Switch/make_glyphs.py` draws its button
 icons. Its button layout must match `Engine/Source/Os/Switch/Input.cpp`.

@@ -16,7 +16,8 @@
 // - A USB keyboard and mouse work as they do on a computer.
 // - The touch screen is the mouse: a tap is a left click, a drag a left drag, and a touch held still for half a second
 //   a right click.
-// - A controller (handheld, Joy-Cons or Pro Controller) has two modes, switched with Minus or a right stick click:
+// - A controller (handheld, Joy-Cons or Pro Controller) has two modes, switched with Minus or a right stick click.
+//   Holding Minus opens the SwitchControls add-on's controls list instead:
 //
 //   Play mode (in the world)           Cursor mode (login screens, and while windows are open)
 //   Left stick   move (W S, Q E)       Left stick   move
@@ -134,6 +135,7 @@ enum OutputType {
     Output_Mouse,
     Output_Wheel,
     Output_ToggleCursor,
+    Output_MinusHold,
     Output_Keyboard,
 };
 
@@ -148,6 +150,12 @@ const uint64_t kButtons[] = {
 };
 
 Output s_outputs[16];
+
+// Minus: a short press switches modes, a long one opens the controls list.
+const uint32_t kMinusHoldMs = 500;
+bool s_minusHeld;
+bool s_minusHoldFired;
+uint32_t s_minusDownMs;
 
 // Left stick movement keys, with hysteresis so they don't flicker at the threshold.
 const float kMovePress = 0.5f;
@@ -551,6 +559,8 @@ Output Mapping(uint64_t button) {
 
     switch (button) {
         case NxButton_Minus:
+            output.type = Output_MinusHold;
+            return output;
         case NxButton_StickR:
             output.type = Output_ToggleCursor;
             return output;
@@ -651,6 +661,11 @@ void PressOutput(const Output& output) {
         case Output_ToggleCursor:
             SetCursorMode(!s_cursorMode);
             break;
+        case Output_MinusHold:
+            s_minusDownMs = OsGetAsyncTimeMs();
+            s_minusHeld = true;
+            s_minusHoldFired = false;
+            break;
         case Output_Keyboard:
             RequestKeyboard();
             break;
@@ -667,8 +682,24 @@ void ReleaseOutput(const Output& output) {
         case Output_Mouse:
             PutMouseButton(static_cast<MOUSEBUTTON>(output.value), false);
             break;
+        case Output_MinusHold:
+            // A short press switches modes; a long one already opened the controls list.
+            if (s_minusHeld && !s_minusHoldFired) {
+                SetCursorMode(!s_cursorMode);
+            }
+
+            s_minusHeld = false;
+            break;
         default:
             break;
+    }
+}
+
+// Holding Minus opens or closes the controls list (F19, which the SwitchControls add-on binds), in any mode.
+void PollMinusHold() {
+    if (s_minusHeld && !s_minusHoldFired && OsGetAsyncTimeMs() - s_minusDownMs >= kMinusHoldMs) {
+        s_minusHoldFired = true;
+        TapKey(KEY_F19);
     }
 }
 
@@ -802,6 +833,8 @@ void PollController(const NxInputState& state, float seconds) {
         }
     }
 
+    PollMinusHold();
+
     const NxStick& left = state.sticks[0];
     SetMoveKey(s_moveForward, KEY_W, left.y);
     SetMoveKey(s_moveBack, KEY_S, -left.y);
@@ -877,7 +910,10 @@ void ShowKeyboard() {
         }
     }
 
-    // Any held controller keys go up first: the applet takes the controller until it closes.
+    // Any held controller keys go up first: the applet takes the controller until it closes. A held Minus is dropped
+    // rather than released, which would switch modes.
+    s_minusHeld = false;
+
     for (Output& output : s_outputs) {
         ReleaseOutput(output);
         output.type = Output_None;

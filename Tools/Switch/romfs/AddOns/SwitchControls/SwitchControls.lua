@@ -79,38 +79,38 @@ local frame = CreateFrame("Frame", "SwitchControlsFrame", UIParent)
 
 local HINTS = {
     play = {
+        title = "Play",
         { "LStick", "Move" },
         { "RStick", "Look" },
         { "B", "Jump" },
-        { "A", "X", "Y", "1 2 3" },
-        { "Dpad", "4-7" },
-        { "L", "8" },
+        { "A", "X", "Y", "Actions 1-3" },
+        { "Dpad", "Actions 4-7" },
         { "R", "Target" },
-        { "ZL", "ZR", "Shift / Ctrl" },
         { "Plus", "Menu" },
-        { "Minus", "Cursor" },
+        { "Minus", "Cursor mode" },
     },
     cursor = {
+        title = "Cursor",
         { "RStick", "Pointer" },
         { "A", "Click" },
         { "B", "Right-click" },
         { "DpadUp", "DpadDown", "Scroll" },
         { "Y", "Chat" },
-        { "X", "Controls" },
         { "Plus", "Close / Menu" },
-        { "Minus", "Play" },
+        { "Minus", "Play mode" },
     },
     text = {
+        title = "Typing",
         { "A", "Enter" },
         { "B", "Cancel" },
         { "X", "Next field" },
         { "Y", "Keyboard" },
-        { "Dpad", "Arrows" },
+        { "DpadLeft", "DpadRight", "Move in text" },
     },
 }
 
 local function HintText(hints)
-    local parts = {}
+    local parts = { "|cffffd100" .. hints.title .. "|r" }
 
     for _, hint in ipairs(hints) do
         local glyphs = ""
@@ -122,7 +122,10 @@ local function HintText(hints)
         table.insert(parts, glyphs .. " " .. hint[#hint])
     end
 
-    return table.concat(parts, "     ")
+    -- How to get the full list, on every bar: hold Minus, or tap the bar.
+    table.insert(parts, "|cffaaaaaaHold|r " .. Glyph("Minus") .. " |cffaaaaaaor tap here: all controls|r")
+
+    return table.concat(parts, "    ")
 end
 
 local HINT_TEXT = {}
@@ -145,7 +148,8 @@ hintBar:SetBackdrop({
 })
 hintBar:SetBackdropColor(0, 0, 0, 0.6)
 hintBar:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
-hintBar:EnableMouse(false)
+-- Tapping the bar (or clicking it in cursor mode) opens the controls list.
+hintBar:EnableMouse(true)
 
 local hintText = hintBar:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 hintText:SetPoint("CENTER", hintBar, "CENTER", 0, 0)
@@ -185,6 +189,7 @@ local HELP = {
     { "X", "This list" },
     { title = "Anywhere" },
     { "Minus", "RStickClick", "Switch between play and cursor mode" },
+    { "Minus", "Hold: this list (open and close)" },
     { "Plus", "Menu, close windows, clear target" },
     { title = "Typing" },
     { "A", "Enter (send)" },
@@ -246,20 +251,33 @@ do
 
     local footer = help:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     footer:SetPoint("TOPLEFT", help, "TOPLEFT", 26, y - 8)
-    footer:SetText("/switch shows this again. /switch hints turns the hint bar on or off.")
+    footer:SetText("Hold " .. Glyph("Minus", 14) .. " or tap the bar at the top of the screen to open this again.")
 
-    help:SetHeight(-y + 44)
+    -- Big enough to tap.
+    local close = CreateFrame("Button", nil, help, "UIPanelButtonTemplate")
+    close:SetWidth(140)
+    close:SetHeight(30)
+    close:SetPoint("BOTTOM", help, "BOTTOM", 0, 18)
+    close:SetText("Close")
+    close:SetScript("OnClick", function()
+        help:Hide()
+    end)
+
+    help:SetHeight(-y + 84)
 end
 
--- X in cursor mode sends F19 (Os/Switch/Input.cpp), which clicks this button.
-local helpToggle = CreateFrame("Button", "SwitchControlsHelpToggle", UIParent)
-helpToggle:SetScript("OnClick", function()
+local function ToggleHelp()
     if help:IsShown() then
         help:Hide()
     else
         help:Show()
     end
-end)
+end
+
+-- Holding Minus, and X in cursor mode, send F19 (Os/Switch/Input.cpp), which clicks this button.
+local helpToggle = CreateFrame("Button", "SwitchControlsHelpToggle", UIParent)
+helpToggle:SetScript("OnClick", ToggleHelp)
+hintBar:SetScript("OnMouseUp", ToggleHelp)
 
 ---------------------------------------------------------------------------------------------------------------------
 -- Cursor mode while menus and windows are open.
