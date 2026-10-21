@@ -69,7 +69,10 @@ nxlink -s bin/Switch/WoW.nro
 (the Homebrew Menu must be open with its nxlink server running: press Y in it). The NRO's folder is then `sdmc:/switch/`,
 so put `Data` there or pass the NRO's final path with `-p switch/wow/WoW.nro`.
 
-Without nxlink, stdout and stderr go to `Logs/Console.txt` in the game folder. Development settings go in `Debug.txt`
+Without nxlink, stdout and stderr go to `Logs/Console.txt` in the game folder, written by a background thread so the
+game never waits on the SD card (a card write can take tens of milliseconds); after a crash, output goes straight to
+the file. Every 5 seconds a `Perf:` line gives the frame rate, the slowest frame, FMOD's CPU use and the audio
+renderer's refills. Development settings go in `Debug.txt`
 there, one `name=value` per line (the Switch has no environment variables): `screenshots=15,25` presses Print Screen
 15 and 25 seconds after start, like `WOWDECOMP_SCREENSHOTS` on macOS; `boost=0` keeps the console's default clocks.
 
@@ -155,8 +158,11 @@ by itself; OK, then **A** (Enter) logs in.
 - **Not yet run on hardware.** Everything up to the first frame is untested: EGL context creation on Mesa, the GL entry
   points, the ARB programs on nouveau, audout, sockets, the controller mapping. Expect a round of fixes from the first
   crash logs (`Errors/` next to `WoW.nro`) and nxlink output.
-- Performance on the Tegra X1 is unknown. Start at 1280x720 with low settings; the CPU (three 1 GHz A57 cores) is likely
-  the limit in cities.
+- Video options: the first time in the world the effects are set to Blizzard's **Fair** preset, a good fit for the
+  Tegra X1 at 720p; later changes are kept. Options that do nothing on the Switch (windowed mode, maximized, window
+  lock, triple buffering, hardware cursor, fix input lag, gamma) are greyed out. Resolutions are 1280x720, plus
+  1920x1080 while docked, at 60 Hz; vertical sync is on by default. The CPU (three A57 cores at 1785 MHz) is likely the
+  limit in cities.
 
 ## Risks and next steps
 

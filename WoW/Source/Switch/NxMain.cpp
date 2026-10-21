@@ -2,6 +2,7 @@
 
 #include <switch.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <dirent.h>
 #include <strings.h>
@@ -50,19 +51,99 @@ bool NxMainInitialize() {
 
 namespace {
 
+// Console output is queued and written to the SD card by a thread of its own: a write to the card can block for tens of
+// milliseconds, a visible hitch on the game thread (the performance report every 5 seconds showed as a stutter). After
+// a crash (wowdecomp_switch_console_sync) writes go straight to the file, so nothing is lost when the process ends.
+const size_t kConsoleQueueLimit = 1 << 20;
+
 FILE* s_consoleFile;
-Mutex s_consoleLock;
+Mutex s_consoleLock;            // the queue
+RMutex s_consoleFileLock;       // the file, held while writing it
+CondVar s_consoleReady;
+char* s_consoleQueue;
+size_t s_consoleQueued;
+bool s_consoleSync;
+Thread s_consoleThread;
+
+void ConsoleWriteFile(const char* data, size_t length) {
+    rmutexLock(&s_consoleFileLock);
+    fwrite(data, 1, length, s_consoleFile);
+    fflush(s_consoleFile);
+    rmutexUnlock(&s_consoleFileLock);
+}
+
+// Writes what is queued. The file lock is taken before the queue is emptied, so output reaches the file in order.
+void ConsoleDrain(char* buffer) {
+    rmutexLock(&s_consoleFileLock);
+    mutexLock(&s_consoleLock);
+    size_t length = s_consoleQueued;
+    memcpy(buffer, s_consoleQueue, length);
+    s_consoleQueued = 0;
+    mutexUnlock(&s_consoleLock);
+
+    if (length) {
+        ConsoleWriteFile(buffer, length);
+    }
+
+    rmutexUnlock(&s_consoleFileLock);
+}
+
+void ConsoleThread(void* argument) {
+    char* buffer = static_cast<char*>(malloc(kConsoleQueueLimit));
+
+    while (true) {
+        mutexLock(&s_consoleLock);
+
+        while (!s_consoleQueued) {
+            condvarWait(&s_consoleReady, &s_consoleLock);
+        }
+
+        mutexUnlock(&s_consoleLock);
+        ConsoleDrain(buffer);
+    }
+}
 
 ssize_t ConsoleWrite(struct _reent* r, void* fd, const char* ptr, size_t len) {
     mutexLock(&s_consoleLock);
-    fwrite(ptr, 1, len, s_consoleFile);
-    fflush(s_consoleFile);
+
+    if (s_consoleSync || !s_consoleQueue) {
+        mutexUnlock(&s_consoleLock);
+        ConsoleWriteFile(ptr, len);
+        return static_cast<ssize_t>(len);
+    }
+
+    // Past the limit (the card stalled for a long time) output is dropped rather than held up.
+    size_t room = kConsoleQueueLimit - s_consoleQueued;
+    size_t length = len < room ? len : room;
+    memcpy(s_consoleQueue + s_consoleQueued, ptr, length);
+    s_consoleQueued += length;
+    condvarWakeOne(&s_consoleReady);
     mutexUnlock(&s_consoleLock);
+
     return static_cast<ssize_t>(len);
 }
 
 devoptab_t s_consoleDevice;
 
+}
+
+extern "C" void wowdecomp_switch_console_sync(void) {
+    if (!s_consoleFile) {
+        return;
+    }
+
+    rmutexLock(&s_consoleFileLock);
+    mutexLock(&s_consoleLock);
+    s_consoleSync = true;
+    size_t length = s_consoleQueued;
+    s_consoleQueued = 0;
+
+    if (length) {
+        ConsoleWriteFile(s_consoleQueue, length);
+    }
+
+    mutexUnlock(&s_consoleLock);
+    rmutexUnlock(&s_consoleFileLock);
 }
 
 void NxMainRedirectConsole() {
@@ -84,6 +165,18 @@ void NxMainRedirectConsole() {
     // newlib keeps stdout and stderr per thread, so freopen would only move the main thread's. Replacing the devices
     // behind file descriptors 1 and 2, as nxlinkStdio does, moves every thread's.
     mutexInit(&s_consoleLock);
+    rmutexInit(&s_consoleFileLock);
+    condvarInit(&s_consoleReady);
+
+    // Low priority on the third core, away from the game thread; it spends its time waiting on the card.
+    s_consoleQueue = static_cast<char*>(malloc(kConsoleQueueLimit));
+
+    if (!s_consoleQueue || R_FAILED(threadCreate(&s_consoleThread, ConsoleThread, nullptr, nullptr, 0x8000, 0x3B, 2)) ||
+        R_FAILED(threadStart(&s_consoleThread))) {
+        free(s_consoleQueue);
+        s_consoleQueue = nullptr;
+    }
+
     s_consoleDevice.name = "con";
     s_consoleDevice.write_r = ConsoleWrite;
     devoptab_list[STD_OUT] = &s_consoleDevice;
@@ -102,6 +195,8 @@ void NxMainRedirectConsole() {
 }
 
 void NxMainShutdown() {
+    wowdecomp_switch_console_sync();
+
     if (s_nxlink >= 0) {
         close(s_nxlink);
         s_nxlink = -1;

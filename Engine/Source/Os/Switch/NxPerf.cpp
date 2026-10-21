@@ -62,17 +62,19 @@ extern "C" void wowdecomp_switch_perf_frame(void) {
     uint64_t movieTotal = s_movieTotalUs.exchange(0);
     uint64_t movieSlowest = s_movieSlowestUs.exchange(0);
 
-    fprintf(stderr,
+    // One write: the line is queued for the console thread, never written to the card from here.
+    char line[512];
+    int length = snprintf(line, sizeof(line),
         "Perf: %.1f fps, slowest frame %.1f ms | FMOD cpu dsp %u%% stream %u%% update %u%% total %u%% | audio longest refill wait %.1f ms, %u underruns",
         s_frames * 1000000.0 / elapsed, s_slowestFrameUs / 1000.0,
         s_fmodPercent[0].load(), s_fmodPercent[1].load(), s_fmodPercent[2].load(), s_fmodPercent[3].load(),
         s_audioGapUs.exchange(0) / 1000.0, s_audioUnderruns.exchange(0));
 
-    if (movieFrames) {
-        fprintf(stderr, " | movie %u frames decoded, %.1f ms average, %.1f ms slowest", movieFrames, movieTotal / 1000.0 / movieFrames, movieSlowest / 1000.0);
+    if (movieFrames && length > 0 && length < static_cast<int>(sizeof(line))) {
+        length += snprintf(line + length, sizeof(line) - length, " | movie %u frames decoded, %.1f ms average, %.1f ms slowest", movieFrames, movieTotal / 1000.0 / movieFrames, movieSlowest / 1000.0);
     }
 
-    fprintf(stderr, "\n");
+    fprintf(stderr, "%s\n", line);
 
     s_windowStart = now;
     s_frames = 0;

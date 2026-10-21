@@ -774,6 +774,72 @@ local function SetUpKeyBindings()
     end)
 end
 
+---------------------------------------------------------------------------------------------------------------------
+-- Video options (FrameXML's VideoOptionsPanels): the controls the Switch has no use for are greyed out, since the game
+-- always fills the screen, the swap chain is the system's, the game draws the cursor and the display gamma can't be
+-- changed. The first time in the world on the Switch, the effects start at Blizzard's "Fair" preset (applied through
+-- the panel's own code, so each slider maps to its setting as it does in the window), which suits the Tegra X1 at
+-- 720p; changes made after that are kept.
+
+local UNUSED_VIDEO_CHECKBOXES = {
+    "TripleBuffer", "HardwareCursor", "FixInputLag", "Windowed", "Maximized", "DisableResize", "DesktopGamma",
+}
+
+local SWITCH_VIDEO_QUALITY = 2
+
+local unusedVideoControls = {}
+
+local function NoOp()
+end
+
+local function DisableGamma()
+    if VideoOptionsResolutionPanelGammaSlider then
+        BlizzardOptionsPanel_Slider_Disable(VideoOptionsResolutionPanelGammaSlider)
+    end
+end
+
+local function SetUpVideoOptions()
+    if not VideoOptionsResolutionPanel or not BlizzardOptionsPanel_CheckButton_Disable then
+        return
+    end
+
+    for _, name in ipairs(UNUSED_VIDEO_CHECKBOXES) do
+        local box = _G["VideoOptionsResolutionPanel" .. name]
+
+        if box then
+            unusedVideoControls[box] = true
+            BlizzardOptionsPanel_CheckButton_Disable(box)
+            box.Enable = NoOp
+        end
+    end
+
+    -- The panel enables some of them again as others change (Maximized with Windowed, the gamma ones together).
+    hooksecurefunc("BlizzardOptionsPanel_CheckButton_Enable", function(box)
+        if unusedVideoControls[box] then
+            BlizzardOptionsPanel_CheckButton_Disable(box)
+        end
+    end)
+
+    hooksecurefunc("VideoOptionsResolutionPanel_RefreshGammaControls", DisableGamma)
+    DisableGamma()
+end
+
+local function ApplySwitchVideoPreset()
+    if SwitchControls_GetOption("videoPreset") ~= nil or not VideoOptionsEffectsPanel_SetVideoQuality then
+        return
+    end
+
+    local applied = pcall(function()
+        VideoOptionsEffectsPanel_SetVideoQuality(SWITCH_VIDEO_QUALITY)
+        VideoOptionsPanel_Okay(VideoOptionsEffectsPanel)
+    end)
+
+    if applied then
+        SwitchControls_SetOption("videoPreset", true)
+        Log("video effects set to the Fair preset")
+    end
+end
+
 local entered = false
 
 frame:RegisterEvent("ADDON_LOADED")
@@ -796,6 +862,8 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             entered = true
             SetOverrideBindingClick(frame, false, "F19", "SwitchControlsHelpToggle")
             BindInteract(false)
+            SetUpVideoOptions()
+            ApplySwitchVideoPreset()
 
             if not NeedsCursor() then
                 SwitchControls_SetMode("play")

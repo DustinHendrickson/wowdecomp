@@ -75,6 +75,7 @@ extern "C" void __libnx_exception_handler(ThreadExceptionDump* dump) {
     }
 
     s_crashing = true;
+    wowdecomp_switch_console_sync();
     s_context.type = dump->error_desc;
     s_context.esr = dump->esr;
     s_context.far = dump->far.x;

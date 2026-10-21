@@ -85,6 +85,13 @@ extern "C"
 #endif
 void wowdecomp_switch_thread_start(int role);
 
+// Console output (Logs/Console.txt) is written to the SD card by a thread of its own; after a crash this flushes what
+// is queued and makes later output go straight to the file (WoW/Source/Switch/NxMain.cpp).
+#if defined(__cplusplus)
+extern "C"
+#endif
+void wowdecomp_switch_console_sync(void);
+
 // The performance report in Logs/Console.txt (Os/Switch/NxPerf.cpp): the game's frames, the audio output's refills and
 // underruns, movie frame decode times and FMOD's CPU use feed it.
 #if defined(__cplusplus)

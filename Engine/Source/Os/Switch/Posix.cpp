@@ -69,6 +69,7 @@ void PrintStack(const void* frame) {
 }
 
 void Terminate() {
+    wowdecomp_switch_console_sync();
     fprintf(stderr, "std::terminate: ");
 
     if (std::exception_ptr exception = std::current_exception()) {
@@ -109,6 +110,7 @@ off_t __wrap_lseek(int fd, off_t offset, int whence) {
 }
 
 void __wrap_abort(void) {
+    wowdecomp_switch_console_sync();
     fprintf(stderr, "abort() called\n");
     PrintStack(__builtin_frame_address(0));
     __real_abort();
