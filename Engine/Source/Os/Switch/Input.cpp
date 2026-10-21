@@ -979,6 +979,16 @@ void Poll() {
 
     int32_t active = NxInputHasFocus() ? 1 : 0;
 
+    // The clocks again whenever the system may have reset them: on docking or undocking, and on coming back from the HOME
+    // menu or sleep.
+    static int32_t s_clocksDocked = -1;
+    int32_t docked = NxInputIsDocked() ? 1 : 0;
+
+    if ((docked != s_clocksDocked || (active && !s_appActive)) && !(SwitchDebugSetting("boost") && !strcmp(SwitchDebugSetting("boost"), "0"))) {
+        s_clocksDocked = docked;
+        NxClocksApply(docked != 0);
+    }
+
     if (active != s_appActive) {
         s_appActive = active;
 

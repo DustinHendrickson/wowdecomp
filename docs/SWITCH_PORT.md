@@ -18,6 +18,7 @@ So the Switch port reuses most of `Mac/` and adds a `Switch/` folder only where 
 | Audio | FMOD Ex with the macOS POSIX OS / net layers and a new output on libnx's audio renderer (`fmodex/switch/src`): one 48 kHz stereo PCM16 voice whose wave buffers a feeder thread fills from FMOD's ring; surround mixes fold to stereo. (The simpler `audout` service refused to start on hardware.) Every thread the ports start may run on all three application cores (`Os/Switch/NxThreads.cpp`; libnx otherwise puts them all on core 0), with FMOD's mixer and the feeder on their own core at a higher priority. |
 | Network | The macOS `poll()` loop for `WowConnection`. The Switch has no pipes and its `poll` only takes sockets, so the wake-up "pipe" is a loopback UDP socket connected to itself. Socket buffers are raised at start (`WoW/Source/Switch/NxMain.cpp`). |
 | Input | `Os/Switch/Input.cpp` (game side) and `NxInput.cpp` (libnx side): controllers, the touch screen, USB keyboard and mouse, the software keyboard. See [Controls](#controls). |
+| Clocks | While the game runs, the CPU is at 1785 MHz and the GPU at 768 MHz docked / 460.8 MHz handheld, the highest clocks Nintendo uses for games (homebrew otherwise gets the 1020 MHz CPU, too slow for the movie decoder and FMOD's software mixing). Memory is left alone; the original clocks come back at exit, and the clocks are applied again after docking, sleep and the HOME menu (`Os/Switch/NxClocks.cpp`). `boost=0` in `Debug.txt` leaves them alone. |
 | Storage | The registry (`SReg`) is `Registry.txt` in the game folder. The clipboard is the game's own. |
 | Errors and crashes | Storm's error dialogs use the system error applet. CPU faults reach libnx's exception handler, which writes the usual `Errors/<date> Crash.txt` with registers and a frame-pointer stack walk; addresses are also given as `Wow.elf+0x...` for `aarch64-none-elf-addr2line -Cfe bin/Switch/Wow.elf <offset>`. |
 
@@ -70,7 +71,7 @@ so put `Data` there or pass the NRO's final path with `-p switch/wow/WoW.nro`.
 
 Without nxlink, stdout and stderr go to `Logs/Console.txt` in the game folder. Development settings go in `Debug.txt`
 there, one `name=value` per line (the Switch has no environment variables): `screenshots=15,25` presses Print Screen
-15 and 25 seconds after start, like `WOWDECOMP_SCREENSHOTS` on macOS.
+15 and 25 seconds after start, like `WOWDECOMP_SCREENSHOTS` on macOS; `boost=0` keeps the console's default clocks.
 
 ### NSP forwarder
 

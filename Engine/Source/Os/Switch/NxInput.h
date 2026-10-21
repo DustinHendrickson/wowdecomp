@@ -87,6 +87,10 @@ bool NxInputShowKeyboard(const char* title, const char* initialText, bool passwo
 // libnx's default NWindow (the screen), sized to width x height: the EGL native window the GL device draws to.
 void* NxInputGetWindow(int32_t width, int32_t height);
 
+// Raises the CPU and GPU clocks to the highest Nintendo uses for games, for the docked or handheld GPU, and puts the
+// original ones back at exit (NxClocks.cpp).
+void NxClocksApply(bool docked);
+
 // The error applet with a message, modal.
 void NxInputShowMessage(const char* title, const char* message);
 
