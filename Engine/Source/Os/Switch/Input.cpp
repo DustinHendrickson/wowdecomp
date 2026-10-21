@@ -36,8 +36,9 @@
 //   While a row of the Key Bindings window waits for a key, the buttons send their play mode keys even in cursor mode
 //   and the left stick sends nothing, so any button, with ZL / ZR held for Shift / Ctrl, can be bound.
 //
-//   In both: L3 is autorun (Num Lock), Plus is Escape. Play mode hides the cursor (touching the screen or moving a USB
-//   mouse shows it); cursor mode brings it back where it was last left.
+//   In both: L3 is autorun (Num Lock), Plus is Escape. Play mode hides the cursor in the middle of the screen, where it
+//   shows what's in front of the character (touching the screen or moving a USB mouse shows it); cursor mode brings it
+//   back where it was last left.
 //
 //   While a text box has the keyboard focus, the face buttons and D-pad edit text instead: A is Enter, B Escape, X Tab,
 //   Y opens the software keyboard, and the D-pad gives the arrow keys. Movement keys aren't sent then, so they don't
@@ -778,15 +779,20 @@ void SetCursorMode(bool cursorMode) {
         s_cursorMode = true;
         MoveMouseTo(s_cursorModePos);
     } else {
+        // The hidden pointer waits in the middle of the screen, where the camera looks: mouseover tooltips and highlights
+        // then follow what's in front of the character.
         s_cursorModePos = s_mousePos;
         s_cursorMode = false;
         s_pointerActive = false;
+        MoveMouseTo(ScreenCenter());
     }
 }
 
 void BeginLook() {
+    // Looking only happens in play mode, whose pointer belongs in the middle of the screen (SetCursorMode), so that is
+    // where it goes back to, even after a touch moved it.
     s_looking = true;
-    s_lookSavedPos = s_mousePos;
+    s_lookSavedPos = ScreenCenter();
 
     // The look starts from the middle of the screen, where the world is, not from wherever the cursor was (over an
     // action bar, say, where a right click means something else).

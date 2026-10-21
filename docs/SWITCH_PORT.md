@@ -115,7 +115,8 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 | Right stick click | interact: loot the nearest body, talk to an NPC, use an object | Right stick click | interact |
 | ZL, ZR (hold) | Shift, Ctrl, for more bindings | | |
 
-Play mode hides the cursor; cursor mode shows it where you last left it. Touching the screen or moving a USB mouse
+Play mode hides the cursor in the middle of the screen, so mouseover tooltips and highlights follow what the camera
+faces; cursor mode shows it where you last left it. Touching the screen or moving a USB mouse
 shows it in either mode. In both modes **L3** (left stick click) is autorun (Num Lock) and **Plus** is Escape (game
 menu, close windows, clear target). Shift and Ctrl with the face buttons and D-pad give 24 more bindings; set them in
 Key Bindings.
