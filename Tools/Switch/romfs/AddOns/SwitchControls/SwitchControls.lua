@@ -425,7 +425,7 @@ local function ToggleHelp()
     end
 end
 
--- Clicking the right stick in play mode sends F17 (Os/Switch/Input.cpp), which clicks this button: the nearest lootable
+-- Clicking the right stick sends F17 (Os/Switch/Input.cpp), which clicks this button: the nearest lootable
 -- body, NPC or usable object, as a right-click on it would.
 local interact = CreateFrame("Button", "SwitchControlsInteract", UIParent)
 interact:SetScript("OnClick", function()
@@ -451,13 +451,26 @@ local WINDOWS = {
     "ColorPickerFrame", "StackSplitFrame", "DropDownList1", "SwitchControlsHelp", "StaticPopup1", "StaticPopup2",
     "StaticPopup3", "StaticPopup4", "GroupLootFrame1", "GroupLootFrame2", "GroupLootFrame3", "GroupLootFrame4",
     "BattlefieldFrame", "InspectFrame", "CalendarFrame", "AchievementFrame", "GuildBankFrame", "BarberShopFrame",
+    "GossipFrame", "MerchantFrame", "QuestFrame", "QuestLogFrame", "TaxiFrame", "ClassTrainerFrame", "BankFrame",
+    "MailFrame", "OpenMailFrame", "AuctionFrame", "PetStableFrame", "TabardFrame", "GuildRegistrarFrame",
+    "PetitionFrame", "TradeSkillFrame", "SpellBookFrame", "CharacterFrame", "FriendsFrame", "PVPFrame",
 }
 
-local function NeedsCursor()
+-- The windows that want the pointer: how many are open, and the first one's name.
+local function OpenWindows()
+    local count, first = 0, nil
+
+    local function Add(window)
+        count = count + 1
+        first = first or (window.GetName and window:GetName()) or "?"
+    end
+
     if GetUIPanel then
         for _, side in ipairs(PANEL_SIDES) do
-            if GetUIPanel(side) then
-                return true
+            local panel = GetUIPanel(side)
+
+            if panel then
+                Add(panel)
             end
         end
     end
@@ -466,7 +479,7 @@ local function NeedsCursor()
         local window = _G[name]
 
         if window and window:IsShown() then
-            return true
+            Add(window)
         end
     end
 
@@ -474,28 +487,42 @@ local function NeedsCursor()
         local container = _G["ContainerFrame" .. i]
 
         if container and container:IsShown() then
-            return true
+            Add(container)
         end
     end
 
-    return false
+    return count, first
+end
+
+local function NeedsCursor()
+    return OpenWindows() > 0
 end
 
 -- auto: cursor mode is on because a window wanted it, and goes when the windows do. suppressed: the player went back to
--- play mode with a window open, so leave it until the windows close.
+-- play mode with windows open, so leave it until they close or another one opens.
 local auto = false
 local suppressed = false
+local lastCount = 0
+
+local function Log(text)
+    if SwitchControls_Log then
+        SwitchControls_Log(text)
+    end
+end
 
 local function UpdateCursor(mode)
-    local needs = NeedsCursor()
+    local count, first = OpenWindows()
+    local opened = count > lastCount
+    lastCount = count
 
-    if not needs then
+    if count == 0 then
         suppressed = false
 
         if auto then
             auto = false
 
             if mode == "cursor" then
+                Log("windows closed: play mode")
                 SwitchControls_SetMode("play")
                 return "play"
             end
@@ -504,11 +531,17 @@ local function UpdateCursor(mode)
         return mode
     end
 
+    if opened then
+        suppressed = false
+    end
+
     if mode == "play" then
         if auto then
             auto = false
             suppressed = true
+            Log("play mode with " .. first .. " open: staying in play mode")
         elseif not suppressed then
+            Log(first .. " opened: cursor mode")
             SwitchControls_SetMode("cursor")
             auto = true
             return "cursor"

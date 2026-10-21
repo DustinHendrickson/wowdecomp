@@ -86,8 +86,8 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 
 - **USB keyboard and mouse** (docked) work as on a computer.
 - **Touch screen**: tap to left-click, drag to left-drag, touch and hold for half a second to right-click.
-- **Controller** (handheld, Joy-Cons, Pro Controller), in two modes. A short press of **Minus** or clicking the
-  **right stick** switches between them; **holding Minus** opens and closes the controls list. The login and character screens start in cursor mode; entering the world switches to play
+- **Controller** (handheld, Joy-Cons, Pro Controller), in two modes. A short press of **Minus** switches between
+  them; **holding Minus** opens and closes the controls list. The login and character screens start in cursor mode; entering the world switches to play
   mode, and opening a menu or window (game menu, bags, character, spellbook, loot, popups, ...) switches to cursor mode
   until it closes. Going back to play mode with a window open keeps play mode until the windows close.
 
@@ -102,7 +102,7 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 | L (hold) + right stick up / down | zoom the camera | | |
 | R | Tab (next enemy) | X | the controls list |
 | ZR (hold) + R | Ctrl+Tab (nearest friend) | | |
-| Right stick click | interact: loot the nearest body, talk to an NPC, use an object | Right stick click | back to play mode |
+| Right stick click | interact: loot the nearest body, talk to an NPC, use an object | Right stick click | interact |
 | ZL, ZR (hold) | Shift, Ctrl, for more bindings | | |
 
 Play mode hides the cursor; cursor mode shows it where you last left it. Touching the screen or moving a USB mouse

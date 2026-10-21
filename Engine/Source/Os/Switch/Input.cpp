@@ -29,8 +29,8 @@
 //   L (hold) + right stick up / down: zoom the camera (the mouse wheel); L alone is 8, sent on release
 //   ZL ZR (hold) Shift, Ctrl           X            F19 (the SwitchControls add-on's controls list)
 //
-//   Clicking the right stick interacts in play mode (F17: the SwitchControls add-on right-clicks the nearest lootable
-//   body, NPC or usable object) and goes back to play mode from the cursor. ZR (Ctrl) + R (Tab) targets the nearest
+//   Clicking the right stick interacts (F17: the SwitchControls add-on right-clicks the nearest lootable body, NPC or
+//   usable object). ZR (Ctrl) + R (Tab) targets the nearest
 //   friend, the default Ctrl+Tab binding.
 //
 //   In both: L3 is autorun (Num Lock), Plus is Escape. Play mode hides the cursor (touching the screen or moving a USB
@@ -578,11 +578,9 @@ Output Mapping(uint64_t button) {
             output.type = Output_MinusHold;
             return output;
         case NxButton_StickR:
-            // Interact in play mode (F17, which the SwitchControls add-on binds); back to play mode from the cursor.
-            if (!s_cursorMode && !TextMode()) {
+            // Interact (F17, which the SwitchControls add-on binds); Minus switches modes.
+            if (!TextMode()) {
                 key(KEY_F17);
-            } else {
-                output.type = Output_ToggleCursor;
             }
 
             return output;
