@@ -16,6 +16,7 @@ target_link_libraries(GxDrawTest
     PRIVATE
         Gx
         Gxu
+        Services
         Tempest
         Images
         BLPFile
