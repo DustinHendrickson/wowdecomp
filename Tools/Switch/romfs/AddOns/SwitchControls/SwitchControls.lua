@@ -110,7 +110,7 @@ local function LogLabels()
         local r, g, b, a = label:GetTextColor()
 
         if shown < 12 then
-            SwitchControls_Log(string.format("label %q font %s %s %s width %.1f height %.1f color %.2f %.2f %.2f %.2f alpha %.2f visible %s", label:GetText() or "", tostring(font), tostring(size), tostring(flags), label:GetStringWidth() or -1, label:GetHeight() or -1, r or -1, g or -1, b or -1, a or -1, label:GetEffectiveAlpha() or -1, tostring((label:IsVisible()))))
+            SwitchControls_Log(string.format("label %q font %s %s %s width %.1f height %.1f color %.2f %.2f %.2f %.2f visible %s", label:GetText() or "", tostring(font), tostring(size), tostring(flags), label:GetStringWidth() or -1, label:GetHeight() or -1, r or -1, g or -1, b or -1, a or -1, tostring((label:IsVisible()))))
             shown = shown + 1
         end
     end
@@ -530,6 +530,15 @@ local function Log(text)
     end
 end
 
+-- Runs one piece of setup, logging its error rather than stopping what follows.
+local function Step(name, step, ...)
+    local ok, message = pcall(step, ...)
+
+    if not ok then
+        Log(name .. " failed: " .. tostring(message))
+    end
+end
+
 local function UpdateCursor(mode)
     local open = OpenWindows()
     local opened = {}
@@ -723,27 +732,84 @@ local function LoadOptions()
     end
 end
 
--- Interact starts on the right stick click (F17), unless that key or the action is bound already. The binding set is 0
--- (the defaults) until the saved bindings load, and saving then would replace them with the defaults: before
--- VARIABLES_LOADED (bindingsLoaded) that waits, after it the defaults are what's in use, saved as account bindings.
-local function BindInteract(bindingsLoaded)
-    if InCombatLockdown() or GetBindingKey("SWITCHCONTROLS_INTERACT") or GetBindingAction("F17") ~= "" then
+-- Interact goes on the right stick click (F17) whenever neither is bound, for this session only: the bindings are never
+-- saved from here. (Saving them before the saved ones had loaded once stored a nearly empty set over them.) It is
+-- checked again when bindings change, since loading them replaces the current ones; not while the Key Bindings window
+-- is open, so it doesn't fight what the player is doing there.
+local function BindInteract()
+    if InCombatLockdown() or (KeyBindingFrame and KeyBindingFrame:IsShown()) then
+        return
+    end
+
+    if GetBindingKey("SWITCHCONTROLS_INTERACT") or GetBindingAction("F17") ~= "" then
+        return
+    end
+
+    SetBinding("F17", "SWITCHCONTROLS_INTERACT")
+end
+
+-- Bindings an earlier build of this add-on wiped (see above): a saved set in use (account or character, so they have
+-- loaded) with nothing on moving forward or back or the game menu, which nobody plays without. Blizzard's defaults are
+-- restored and saved, once a session.
+local repairedBindings = false
+
+local function RepairBindings()
+    if repairedBindings or InCombatLockdown() or (KeyBindingFrame and KeyBindingFrame:IsShown()) then
         return
     end
 
     local set = GetCurrentBindingSet()
 
-    if set ~= 1 and set ~= 2 then
-        if not bindingsLoaded then
-            return
+    if (set ~= 1 and set ~= 2) or GetBindingKey("MOVEFORWARD") or GetBindingKey("MOVEBACKWARD") or GetBindingKey("TOGGLEGAMEMENU") then
+        return
+    end
+
+    repairedBindings = true
+    Log("key bindings were wiped (binding set " .. set .. "): restoring the defaults")
+    LoadBindings(0)
+    SaveBindings(set)
+end
+
+-- Bindings changed (loaded, set, saved): repair a wiped set and put Interact back. SetBinding and LoadBindings fire this
+-- again from inside; that inner round has nothing to do.
+local checkingBindings = false
+
+local function CheckBindings()
+    if checkingBindings then
+        return
+    end
+
+    checkingBindings = true
+    Step("binding repair", RepairBindings)
+    Step("interact binding", BindInteract)
+    checkingBindings = false
+end
+
+---------------------------------------------------------------------------------------------------------------------
+-- Chat: a channel notice ChatFrame has no text for (no CHAT_<notice>_NOTICE string) makes its handler format nil, a Lua
+-- error on every such notice. Those are dropped here, and their arguments logged to find where they come from.
+
+local function UnknownNoticeFilter(self, event, notice, ...)
+    if type(notice) == "string" and (_G["CHAT_" .. notice .. "_NOTICE_BN"] or _G["CHAT_" .. notice .. "_NOTICE"]) then
+        return false
+    end
+
+    if self == DEFAULT_CHAT_FRAME then
+        local args = { tostring(notice) }
+
+        for i = 1, select("#", ...) do
+            args[#args + 1] = tostring((select(i, ...)))
         end
 
-        set = 1
+        Log("dropped " .. event .. " with no text: " .. table.concat(args, " | "))
     end
 
-    if SetBinding("F17", "SWITCHCONTROLS_INTERACT") then
-        SaveBindings(set)
-    end
+    return true
+end
+
+if ChatFrame_AddMessageEventFilter then
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", UnknownNoticeFilter)
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE_USER", UnknownNoticeFilter)
 end
 
 ---------------------------------------------------------------------------------------------------------------------
@@ -869,14 +935,6 @@ local function ApplySwitchVideoPreset()
     end
 end
 
-local function Step(name, step, ...)
-    local ok, message = pcall(step, ...)
-
-    if not ok then
-        Log(name .. " failed: " .. tostring(message))
-    end
-end
-
 local entered = false
 
 frame:RegisterEvent("ADDON_LOADED")
@@ -910,7 +968,7 @@ frame:SetScript("OnEvent", function(self, event, arg1)
             -- Each step on its own, so one failing (an error is logged) doesn't keep the others, play mode above all,
             -- from happening.
             Step("help binding", SetOverrideBindingClick, frame, false, "F19", "SwitchControlsHelpToggle")
-            Step("interact binding", BindInteract, false)
+            CheckBindings()
             Step("video options", SetUpVideoOptions)
             Step("video preset", ApplySwitchVideoPreset)
 
@@ -929,10 +987,14 @@ frame:SetScript("OnEvent", function(self, event, arg1)
 
         Step("hotkeys", UpdateAllHotkeys)
     elseif event == "UPDATE_BINDINGS" then
+        if entered then
+            CheckBindings()
+        end
+
         UpdateAllHotkeys()
     elseif event == "VARIABLES_LOADED" then
         -- Bindings can arrive after PLAYER_ENTERING_WORLD, replacing the ones set there.
-        BindInteract(true)
+        CheckBindings()
     elseif event == "ADDON_LOADED" and arg1 == "Blizzard_BindingUI" then
         SetUpKeyBindings()
     elseif event == "PLAYER_LOGOUT" then
