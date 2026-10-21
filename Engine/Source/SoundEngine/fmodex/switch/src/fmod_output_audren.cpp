@@ -91,7 +91,7 @@ namespace
     const AudioRendererConfig kRendererConfig =
     {
         AudioRendererOutputRate_48kHz,
-        1,      /* voices */
+        4,      /* voices: renderer channels, one per channel of a voice, so the stereo voice takes two */
         0,      /* effects */
         1,      /* sinks */
         1,      /* mix objects */
