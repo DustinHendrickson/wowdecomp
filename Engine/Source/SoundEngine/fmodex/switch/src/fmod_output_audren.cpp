@@ -104,7 +104,11 @@ void *OutputAudren::feederThread(void *param)
     OutputAudren *output = (OutputAudren *)param;
     AudioDriver  *driver = (AudioDriver *)output->mDriver;
 
-    wowdecomp_switch_thread_start(WOWDECOMP_THREAD_AUDIO);
+    wowdecomp_switch_thread_start(WOWDECOMP_THREAD_AUDIO_OUTPUT);
+
+    /* Underruns (every buffer played out before it was refilled), reported every few seconds in Logs/Console.txt. */
+    unsigned int underruns = 0;
+    u64          lastReport = armGetSystemTick();
 
     /*
         Keep every wave buffer queued: one that has played (or was never queued) is refilled from the ring and queued
@@ -113,6 +117,29 @@ void *OutputAudren::feederThread(void *param)
     while (output->mRunning)
     {
         bool queued = false;
+        int  idle = 0;
+
+        for (int i = 0; i < NUMHWBUFFERS; i++)
+        {
+            AudioDriverWaveBuf *buffer = (AudioDriverWaveBuf *)output->mWaveBuf[i];
+
+            if (buffer->state == AudioDriverWaveBufState_Free || buffer->state == AudioDriverWaveBufState_Done)
+            {
+                idle++;
+            }
+        }
+
+        if (idle == NUMHWBUFFERS && output->mPlayed)
+        {
+            underruns++;
+        }
+
+        if (underruns && armTicksToNs(armGetSystemTick() - lastReport) >= 5000000000ull)
+        {
+            fprintf(stderr, "FMOD audren: %u underruns in the last 5 s\n", underruns);
+            underruns = 0;
+            lastReport = armGetSystemTick();
+        }
 
         for (int i = 0; i < NUMHWBUFFERS; i++)
         {

@@ -78,6 +78,7 @@ static inline time_t wowdecomp_timegm(struct tm* parts) {
 #define WOWDECOMP_THREAD_OTHER 0
 #define WOWDECOMP_THREAD_GAME 1
 #define WOWDECOMP_THREAD_AUDIO 2
+#define WOWDECOMP_THREAD_AUDIO_OUTPUT 3
 
 #if defined(__cplusplus)
 extern "C"

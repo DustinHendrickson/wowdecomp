@@ -59,8 +59,11 @@ namespace
         ThreadStart *start = (ThreadStart *)param;
 
 #if defined(__SWITCH__)
-        /* The mixer and the stream feeders run high: on their own core, ahead of the game. */
-        wowdecomp_switch_thread_start(start->priority >= FMOD_THREAD_PRIORITY_HIGH ? WOWDECOMP_THREAD_AUDIO : WOWDECOMP_THREAD_OTHER);
+        /*
+            Every FMOD thread (mixer, stream decoders, the non-blocking loader) runs ahead of the game on the audio core:
+            a stream thread that waits behind the game's loaders lets the music run dry.
+        */
+        wowdecomp_switch_thread_start(WOWDECOMP_THREAD_AUDIO);
 #endif
 
         if (start->name[0])

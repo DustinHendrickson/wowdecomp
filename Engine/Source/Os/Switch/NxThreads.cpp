@@ -14,6 +14,9 @@ namespace {
 // Horizon priorities: lower is more urgent. The main thread runs at 0x2C.
 const s32 kNormalPriority = 0x2C;
 const s32 kAudioPriority = 0x24;
+// Above FMOD's mixer: Horizon doesn't time-slice threads of equal priority, so a long mix could keep the thread that
+// hands sound to the renderer waiting until its queue ran dry.
+const s32 kAudioOutputPriority = 0x20;
 const u32 kApplicationCores = 0x7;
 
 }
@@ -29,6 +32,10 @@ extern "C" void wowdecomp_switch_thread_start(int role) {
         case WOWDECOMP_THREAD_AUDIO:
             core = 2;
             priority = kAudioPriority;
+            break;
+        case WOWDECOMP_THREAD_AUDIO_OUTPUT:
+            core = 2;
+            priority = kAudioOutputPriority;
             break;
         default:
             core = 1;
