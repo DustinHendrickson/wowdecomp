@@ -1,6 +1,7 @@
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <new>
 #include <typeinfo>
@@ -59,6 +60,9 @@ XMLTree* FrameXML_LoadXML(const char* filename, MD5_CTX* md5, CStatus* status) {
 
     if (!SFile::ReadFile(nullptr, filename, &data, &size, 0, 1, nullptr)) {
         status->Add(STATUS_ERROR, "Couldn't open %s", filename);
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+        fprintf(stderr, "XML: couldn't read %s\n", filename);
+#endif
         return nullptr;
     }
 
@@ -595,6 +599,9 @@ int32_t FrameXML_CreateFrames(const char* tocFile, const char* wrapper, MD5_CTX*
 
     if (!SFile::ReadFile(nullptr, tocFile, &data, &size, 1, 1, nullptr)) {
         status->Add(STATUS_ERROR, "Couldn't open %s", tocFile);
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+        fprintf(stderr, "XML: couldn't read %s\n", tocFile);
+#endif
         return 0;
     }
 

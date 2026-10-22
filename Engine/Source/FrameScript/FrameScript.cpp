@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <malloc.h>
 #include "Engine/Source/FrameScript/FrameScript.h"
@@ -816,6 +817,12 @@ int32_t FrameScript_ExecuteBuffer(const char* buffer, size_t bytes, const char* 
             status->Add(STATUS_ERROR, "%s", lua_tostring(L, -1));
         }
 
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+        // Syntax errors go to FrameXML.log only when the game logs the add-on's status; the Switch's console log has
+        // them always.
+        fprintf(stderr, "Lua: %s (%u bytes)\n", lua_tostring(L, -1), static_cast<uint32_t>(bytes));
+#endif
+
         if (lua_pcall(L, 1, 0, 0)) {
             lua_pop(L, 1);
         }
@@ -888,6 +895,10 @@ int32_t FrameScript_ExecuteFile(const char* filename, const char* wrapper, MD5_C
         if (status) {
             status->Add(STATUS_ERROR, "Error loading %s", path);
         }
+
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+        fprintf(stderr, "Lua: couldn't read %s\n", path);
+#endif
 
         return 0;
     }
