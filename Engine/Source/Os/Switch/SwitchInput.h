@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-// A text box gained or lost the keyboard focus (OsIMEEnable). Gaining it opens the software keyboard.
+// A text box gained or lost the keyboard focus (OsIMEEnable). Keeping it a moment opens the software keyboard.
 void SwitchSetTextFocus(bool focus);
 
 // No text box has the focus after all (one was destroyed while focused, so never reported losing it): the controller

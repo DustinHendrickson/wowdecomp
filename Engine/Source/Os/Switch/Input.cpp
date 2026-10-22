@@ -250,6 +250,12 @@ bool s_secureFocus;
 KeyboardState s_keyboardState;
 uint32_t s_copyClipboardGeneration;
 
+// A text box that gains the focus gets the software keyboard once it has kept the focus a moment. Some boxes are focused
+// only in passing (while the world loads), and the keys that copy a box's text (Ctrl+A, Ctrl+C) would then reach the game
+// instead: C opened the character panel at every login.
+const uint32_t kKeyboardFocusMs = 200;
+uint64_t s_keyboardFocusSinceMs;
+
 C2iVector ScreenCenter() {
     C2iVector center;
     center.x = s_contentWidth / 2;
@@ -1071,6 +1077,12 @@ void ShowKeyboard() {
 }
 
 void PollKeyboardRequest() {
+    // The keyboard for a text box that has kept the focus long enough (SwitchSetTextFocus).
+    if (s_keyboardFocusSinceMs && OsGetAsyncTimeMs() - s_keyboardFocusSinceMs >= kKeyboardFocusMs) {
+        s_keyboardFocusSinceMs = 0;
+        RequestKeyboard();
+    }
+
     switch (s_keyboardState) {
         case Keyboard_Copying:
             // The copy keys went out with the last poll and the game has handled them by now.
@@ -1460,10 +1472,11 @@ void SwitchSetTextFocus(bool focus) {
     if (focus && !s_textFocus) {
         fprintf(stderr, "Input: text box focused\n");
         s_textFocus = true;
-        RequestKeyboard();
+        s_keyboardFocusSinceMs = OsGetAsyncTimeMs();
     } else if (!focus && s_textFocus) {
         fprintf(stderr, "Input: text box unfocused\n");
         s_textFocus = false;
+        s_keyboardFocusSinceMs = 0;
     }
 }
 
@@ -1472,6 +1485,7 @@ void SwitchClearTextFocus() {
         fprintf(stderr, "Input: text focus cleared, no text box has it\n");
         s_textFocus = false;
         s_secureFocus = false;
+        s_keyboardFocusSinceMs = 0;
     }
 }
 
