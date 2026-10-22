@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <new>
 #include "WoW/Source/SoundInterface/SoundInterface2ZoneSounds.h"
 #include "Engine/Source/BlizzardCore/SFile2-Core.h"
@@ -481,6 +482,11 @@ int32_t SI2::PlaySoundFile(const char* filename, int32_t group) {
     sound->SetVolume(1.0f);
     sound->CompleteNonBlockingLoad();
     sound->Play();
+
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+    // Add-ons' sounds (PlaySoundFile, PlayMusic): whether each one plays, for diagnosing add-ons on the console.
+    fprintf(stderr, "Sound: %s %s %s\n", group == 5 ? "music" : "sound", filename, sound->IsPlaying() ? "playing" : "not playing");
+#endif
 
     if (sound->IsPlaying() && group == 5) {
         SI2::sm_bLuaMusicPlaying = 1;

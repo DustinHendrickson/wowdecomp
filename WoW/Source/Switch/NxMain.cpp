@@ -201,6 +201,8 @@ void NxMainRedirectConsole() {
 }
 
 void NxMainShutdown() {
+    // Before unlocking the exit: after a close from the HOME menu, the system ends the process as soon as it's unlocked.
+    NxClocksRestore();
     wowdecomp_switch_console_sync();
 
     // The exit lock the input layer takes, so closing from the HOME menu quits the game properly; it's done now.
@@ -215,7 +217,6 @@ void NxMainShutdown() {
 }
 
 void NxMainExit(int result) {
-    NxClocksRestore();
     fprintf(stderr, "Quit: exiting (%d)\n", result);
     wowdecomp_switch_console_sync();
 

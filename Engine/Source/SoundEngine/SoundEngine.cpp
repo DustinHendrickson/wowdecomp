@@ -1,6 +1,7 @@
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include "Engine/Source/SoundEngine/SoundEngine.h"
@@ -2906,6 +2907,10 @@ int32_t SE2::CreateWaveData(FMOD::System* system, const char* filename, FMOD_MOD
     }
 
     if (!SFile::OpenEx(nullptr, filename, 1, &internal->m_file)) {
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+        // Not in SESound.log, which leaves missing files out.
+        fprintf(stderr, "Sound: couldn't open %s\n", filename);
+#endif
         SE2::Log_Write(__LINE__, __FILE__, FMOD_ERR_FILE_NOTFOUND, filename);
         s_soundListCritSect.Enter();
         goto fail;
