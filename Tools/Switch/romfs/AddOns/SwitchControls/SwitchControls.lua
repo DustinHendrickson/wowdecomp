@@ -471,9 +471,9 @@ local WINDOWS = {
     "GossipFrame", "MerchantFrame", "QuestFrame", "QuestLogFrame", "TaxiFrame", "ClassTrainerFrame", "BankFrame",
     "MailFrame", "OpenMailFrame", "AuctionFrame", "PetStableFrame", "TabardFrame", "GuildRegistrarFrame",
     "PetitionFrame", "TradeSkillFrame", "SpellBookFrame", "CharacterFrame", "FriendsFrame", "PVPFrame",
-    -- The Lua error dialog sits in the middle of the screen, where the right stick's look clicks: it needs the cursor
+    -- The Lua error dialogs sit in the middle of the screen, where the right stick's look clicks: they need the cursor
     -- to be closed, or the camera can't turn.
-    "BasicScriptErrors", "ScriptErrors",
+    "BasicScriptErrors", "ScriptErrors", "ScriptErrorsFrame",
 }
 
 -- The windows that want the pointer that are open, as a set, and how many.
@@ -907,6 +907,9 @@ local function UnknownNoticeFilter(self, event, notice, ...)
     return true
 end
 
+-- The server's answer to joining LookingForGroup without using the LFG tool: 3.3.5 has no text for it.
+CHAT_NOT_IN_LFG_NOTICE = CHAT_NOT_IN_LFG_NOTICE or "LookingForGroup (channel %d) is only for players queued in the Looking For Group tool."
+
 if ChatFrame_AddMessageEventFilter then
     ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE", UnknownNoticeFilter)
     ChatFrame_AddMessageEventFilter("CHAT_MSG_CHANNEL_NOTICE_USER", UnknownNoticeFilter)
@@ -1188,6 +1191,16 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         CheckBindings()
     elseif event == "ADDON_LOADED" and arg1 == "Blizzard_BindingUI" then
         SetUpKeyBindings()
+    elseif event == "ADDON_LOADED" and arg1 == "Blizzard_DebugTools" then
+        -- The error window scrolls to its edit box's cursor, which its OnCursorChanged sets once the box has been laid
+        -- out; showing the same error again before that reads it unset, an error of its own, which the window then
+        -- shows... hundreds of times over. Starting at the top is right for a new error anyway.
+        local box = ScriptErrorsFrameScrollFrameText
+
+        if box then
+            box.cursorOffset = box.cursorOffset or 0
+            box.cursorHeight = box.cursorHeight or 0
+        end
     elseif event == "PLAYER_LOGOUT" then
         -- Back to the character screens, which need the pointer.
         keyCapture = false

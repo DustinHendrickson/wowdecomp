@@ -85,6 +85,14 @@ extern "C"
 #endif
 void wowdecomp_switch_thread_start(int role);
 
+// The path as it exists on the SD card when it differs from the one given only in letter case (the card's file system
+// is case-sensitive; the game and add-ons expect Windows' insensitivity): 1 with it in resolved, 0 to use the path as
+// given (Os/Switch/Posix.cpp).
+#if defined(__cplusplus)
+extern "C"
+#endif
+int wowdecomp_switch_resolve_case(const char* path, char* resolved, size_t size);
+
 // Console output (Logs/Console.txt) is written to the SD card by a thread of its own; after a crash this flushes what
 // is queued and makes later output go straight to the file (WoW/Source/Switch/NxMain.cpp).
 #if defined(__cplusplus)

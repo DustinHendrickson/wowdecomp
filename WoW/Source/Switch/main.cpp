@@ -95,6 +95,7 @@ void* ClientThread(void* param) {
     wowdecomp_switch_thread_start(WOWDECOMP_THREAD_GAME);
     StormRtlInitialize();
     s_result = CommonMain();
+    fprintf(stderr, "Quit: the game has shut down (%d)\n", s_result);
     return nullptr;
 }
 
@@ -137,6 +138,5 @@ int main() {
 
     pthread_attr_destroy(&attributes);
     NxMainShutdown();
-
-    return s_result;
+    NxMainExit(s_result);
 }

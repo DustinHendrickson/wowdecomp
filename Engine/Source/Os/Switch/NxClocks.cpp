@@ -73,8 +73,13 @@ void Restore() {
     SetRate(PcvModuleId_CpuBus, PcvModule_CpuBus, s_originalCpuHz);
     SetRate(PcvModuleId_GPU, PcvModule_GPU, s_originalGpuHz);
     CloseService();
+    s_saved = false;
 }
 
+}
+
+void NxClocksRestore() {
+    Restore();
 }
 
 void NxClocksApply(bool docked) {

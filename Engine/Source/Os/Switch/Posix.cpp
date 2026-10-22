@@ -13,6 +13,13 @@
 
 #include <cerrno>
 #include <cstdarg>
+#include <cstring>
+#include <dirent.h>
+#include <string>
+#include <strings.h>
+#include <sys/stat.h>
+#include <unordered_map>
+#include <vector>
 #include <cstdint>
 #include <cstdio>
 #include <exception>
@@ -176,4 +183,120 @@ pid_t waitpid(pid_t pid, int* status, int options) {
     return -1;
 }
 
+}
+
+// Paths without regard to case. The Switch's SD card file system matches names case-sensitively; Windows and macOS don't,
+// and the game and its add-ons rely on that (an add-on loading Libs\LibStub\LibStub.lua from a folder named libs, say).
+// A path that doesn't exist as written is matched one component at a time, ignoring case; components with no match stay
+// as written, for files and folders being created. Directory listings are kept a couple of seconds, as the game probes
+// for files that don't exist (saved variables, Bindings.xml) many times over.
+namespace {
+
+const uint64_t kListingLifeMs = 2000;
+
+struct Listing {
+    uint64_t readMs;
+    std::vector<std::string> names;
+};
+
+std::mutex s_caseLock;
+std::unordered_map<std::string, Listing> s_listings;
+
+uint64_t NowMs() {
+    return clock_gettime_nsec_np(CLOCK_UPTIME_RAW) / 1000000;
+}
+
+// Called with s_caseLock held.
+bool FindName(const std::string& directory, const std::string& name, std::string* match) {
+    uint64_t now = NowMs();
+
+    for (int attempt = 0; attempt < 2; attempt++) {
+        Listing& listing = s_listings[directory];
+
+        if (attempt == 1 || !listing.readMs || now - listing.readMs > kListingLifeMs) {
+            if (attempt == 1 && listing.readMs == now) {
+                break;
+            }
+
+            listing.names.clear();
+            listing.readMs = now;
+
+            if (DIR* handle = opendir(directory.c_str())) {
+                while (dirent* entry = readdir(handle)) {
+                    listing.names.emplace_back(entry->d_name);
+                }
+
+                closedir(handle);
+            }
+        }
+
+        for (const std::string& candidate : listing.names) {
+            if (!strcasecmp(candidate.c_str(), name.c_str())) {
+                *match = candidate;
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+}
+
+extern "C" int wowdecomp_switch_resolve_case(const char* path, char* resolved, size_t size) {
+    struct stat info;
+
+    if (!path || !*path || stat(path, &info) == 0) {
+        return 0;
+    }
+
+    std::string result;
+    std::string current;
+    const char* cursor = path;
+
+    if (*cursor == '/') {
+        result = "/";
+        cursor++;
+    }
+
+    bool missing = false;
+    bool changed = false;
+    std::lock_guard<std::mutex> lock(s_caseLock);
+
+    while (*cursor) {
+        const char* slash = strchr(cursor, '/');
+        std::string part = slash ? std::string(cursor, slash - cursor) : std::string(cursor);
+        cursor = slash ? slash + 1 : cursor + part.size();
+
+        if (part.empty()) {
+            continue;
+        }
+
+        std::string directory = result.empty() ? "." : result;
+        std::string candidate = result.empty() || result.back() == '/' ? result + part : result + "/" + part;
+
+        if (!missing && part != "." && part != ".." && stat(candidate.c_str(), &info) != 0) {
+            std::string match;
+
+            if (FindName(directory, part, &match)) {
+                candidate = result.empty() || result.back() == '/' ? result + match : result + "/" + match;
+                changed = true;
+            } else {
+                missing = true;
+            }
+        }
+
+        result = candidate;
+    }
+
+    if (!changed || result.size() + 1 > size) {
+        return 0;
+    }
+
+    if (path[strlen(path) - 1] == '/') {
+        result += '/';
+    }
+
+    memcpy(resolved, result.c_str(), result.size() + 1);
+    return 1;
 }

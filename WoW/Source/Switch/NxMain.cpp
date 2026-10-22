@@ -9,6 +9,7 @@
 #include <sys/iosupport.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "Engine/Source/Os/Switch/NxInput.h"
 #include "WoW/Source/Switch/NxMain.h"
 
 extern "C" int __system_argc;
@@ -67,8 +68,13 @@ Thread s_consoleThread;
 
 void ConsoleWriteFile(const char* data, size_t length) {
     rmutexLock(&s_consoleFileLock);
-    fwrite(data, 1, length, s_consoleFile);
-    fflush(s_consoleFile);
+
+    // Closed by NxMainExit just before the process ends.
+    if (s_consoleFile) {
+        fwrite(data, 1, length, s_consoleFile);
+        fflush(s_consoleFile);
+    }
+
     rmutexUnlock(&s_consoleFileLock);
 }
 
@@ -206,6 +212,21 @@ void NxMainShutdown() {
     }
 
     socketExit();
+}
+
+void NxMainExit(int result) {
+    NxClocksRestore();
+    fprintf(stderr, "Quit: exiting (%d)\n", result);
+    wowdecomp_switch_console_sync();
+
+    if (s_consoleFile) {
+        rmutexLock(&s_consoleFileLock);
+        fclose(s_consoleFile);
+        s_consoleFile = nullptr;
+        rmutexUnlock(&s_consoleFileLock);
+    }
+
+    svcExitProcess();
 }
 
 void NxMainGameFolder(char* buffer, size_t size) {

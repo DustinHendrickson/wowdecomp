@@ -91,6 +91,9 @@ void* NxInputGetWindow(int32_t width, int32_t height);
 // original ones back at exit (NxClocks.cpp).
 void NxClocksApply(bool docked);
 
+// The clocks as they were before NxClocksApply raised them (also done at exit).
+void NxClocksRestore();
+
 // The error applet with a message, modal.
 void NxInputShowMessage(const char* title, const char* message);
 

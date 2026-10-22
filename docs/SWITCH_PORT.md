@@ -69,6 +69,13 @@ nxlink -s bin/Switch/WoW.nro
 (the Homebrew Menu must be open with its nxlink server running: press Y in it). The NRO's folder is then `sdmc:/switch/`,
 so put `Data` there or pass the NRO's final path with `-p switch/wow/WoW.nro`.
 
+File names on the SD card are matched without regard to case, as on Windows: the card's file system is case-sensitive,
+and add-ons often load, say, `Libs\LibStub\LibStub.lua` from a folder named `libs`.
+
+Quitting (Exit Game, or closing from the HOME menu) ends the process once the game has shut down and saved, without
+the C++ and libnx teardown after it, where threads still running could crash it; the console returns to the HOME menu
+rather than the Homebrew Menu. `Logs/Console.txt` ends with `Quit:` lines.
+
 Closing the game from the HOME menu asks it to quit (the exit is locked until it has), so it logs out and saves the UI's
 saved variables, key bindings and settings as Exit Game does; if quitting takes over 30 seconds the system ends it. (Files written through the Os layer, saved variables among
 them, are gathered in memory and written in large pieces: a write per key and value is slow on the SD card, long

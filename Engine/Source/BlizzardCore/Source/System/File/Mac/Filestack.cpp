@@ -87,6 +87,15 @@ const char* SkipDevice(const char* path) {
 std::string NativePath(const char* path) {
     std::string native = path ? SkipDevice(path) : "";
     std::replace(native.begin(), native.end(), '\\', '/');
+
+#if defined(__SWITCH__)
+    char resolved[1024];
+
+    if (wowdecomp_switch_resolve_case(native.c_str(), resolved, sizeof(resolved))) {
+        native = resolved;
+    }
+#endif
+
     return native;
 }
 

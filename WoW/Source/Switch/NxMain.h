@@ -13,6 +13,12 @@ bool NxMainInitialize();
 
 void NxMainShutdown();
 
+// Ends the process once the game has shut down and saved (after NxMainShutdown), restoring the clocks and closing the
+// console log. It skips the C++ static destructors and libnx's service teardown, which run with threads still about
+// (audio, graphics, network) and are the likely place of a crash on quitting that left no report ("software closed"):
+// the system then returns to the HOME menu rather than the Homebrew Menu.
+[[noreturn]] void NxMainExit(int result);
+
 // Without nxlink, stdout and stderr go to Logs/Console.txt in the game folder (the working directory by then), so a run
 // on the console or in an emulator leaves its output behind.
 void NxMainRedirectConsole();
