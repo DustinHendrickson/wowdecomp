@@ -31,7 +31,8 @@
 //                                      R (hold) + right stick up / down: the mouse wheel (scroll); R alone is Tab
 //
 //   Clicking the right stick interacts (F17: the SwitchControls add-on right-clicks the nearest lootable body, NPC or
-//   usable object). ZR (Ctrl) + R (Tab) targets the nearest friend, the default Ctrl+Tab binding.
+//   usable object). ZR (Ctrl) + R (Tab) targets the nearest friendly or neutral unit (the add-on binds Ctrl+Tab to that,
+//   in place of the game's nearest friend).
 //
 //   While a row of the Key Bindings window waits for a key, the buttons send their play mode keys even in cursor mode
 //   and the left stick sends nothing, so any button, with ZL / ZR held for Shift / Ctrl, can be bound.

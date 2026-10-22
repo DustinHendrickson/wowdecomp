@@ -212,6 +212,17 @@ int32_t Script_SwitchControls_Interact(lua_State* L) {
     return 1;
 }
 
+// SwitchControls_TargetNonHostile([reverse]): the next living friendly or neutral unit, cycling as Tab does through
+// enemies (the game's own nearest-target search, with the Switch's target type 7). Add-on code may not target, so this
+// runs as the game.
+int32_t Script_SwitchControls_TargetNonHostile(lua_State* L) {
+    const char* taint = lua_tainted;
+    lua_tainted = nullptr;
+    TargetNearestEnemy(lua_toboolean(L, 1), 7);
+    lua_tainted = taint;
+    return 0;
+}
+
 int32_t Script_SwitchControls_IsDocked(lua_State* L) {
     lua_pushboolean(L, SwitchIsDocked());
     return 1;
@@ -232,6 +243,7 @@ const struct {
     { "SwitchControls_SetPointer", &Script_SwitchControls_SetPointer },
     { "SwitchControls_DisplayChanged", &Script_SwitchControls_DisplayChanged },
     { "SwitchControls_Interact", &Script_SwitchControls_Interact },
+    { "SwitchControls_TargetNonHostile", &Script_SwitchControls_TargetNonHostile },
 };
 
 // The login screens' video options (GlueXML, where add-ons don't load) get what the SwitchControls add-on does to the

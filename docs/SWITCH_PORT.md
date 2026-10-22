@@ -112,7 +112,7 @@ The game sees a keyboard and mouse; everything is mapped to those, so the in-gam
 | L (hold) + right stick up / down | zoom the camera | | |
 | R | Tab (next enemy) | X | the controls list |
 | | | R (hold) + right stick up / down | scroll (mouse wheel); R alone is Tab |
-| ZR (hold) + R | Ctrl+Tab (nearest friend) | | |
+| ZR (hold) + R | nearest friendly or neutral unit, again for the next (Ctrl+Tab) | | |
 | Right stick click | interact: loot the nearest body, talk to an NPC, use an object | Right stick click | interact |
 | ZL, ZR (hold) | Shift, Ctrl, for more bindings | | |
 

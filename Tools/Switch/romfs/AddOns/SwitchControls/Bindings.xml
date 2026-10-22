@@ -2,4 +2,7 @@
 	<Binding name="SWITCHCONTROLS_INTERACT" header="SWITCHCONTROLS">
 		SwitchControlsInteract:Click()
 	</Binding>
+	<Binding name="SWITCHCONTROLS_TARGETNONHOSTILE" header="SWITCHCONTROLS">
+		SwitchControls_TargetNonHostile()
+	</Binding>
 </Bindings>

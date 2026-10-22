@@ -16,6 +16,7 @@
 //   SwitchControls_SetPointer(x, y)                       pointer to (x, y), fractions of the screen from bottom left
 //   changed = SwitchControls_DisplayChanged()             docking changed the render size: the device needs a restart
 //   interacted = SwitchControls_Interact()                right-click the nearest lootable body, NPC or usable object
+//   SwitchControls_TargetNonHostile([reverse])            target the next friendly or neutral unit, as Tab cycles enemies
 
 void SwitchControlsRegisterScriptFunctions();
 

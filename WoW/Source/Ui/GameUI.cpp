@@ -5102,6 +5102,14 @@ int32_t UnitMatchesTargetType(CGUnit_C* unit, CGUnit_C* target, int32_t type) {
             return CGGameUI::IsPartyMember(target->m_obj->m_guid) != 0;
         }
 
+#if defined(WOWDECOMP_PLATFORM_SWITCH)
+        // The Switch controller's "nearest non-hostile" (SwitchControls_TargetNonHostile): living friendly and neutral
+        // units alike, the travelling merchants and quest givers "nearest friend" skips for being neutral.
+        case 7: {
+            return unit->UnitReaction(target) >= UNIT_REACTION_NEUTRAL && target->m_unit->m_unitFieldHealth > 0;
+        }
+#endif
+
         default: {
             return 1;
         }

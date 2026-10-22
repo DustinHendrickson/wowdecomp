@@ -296,7 +296,7 @@ local HELP_COLUMNS = {
         { "L", "Tap: action button 8" },
         { "L", "RStick", "Hold L: zoom camera" },
         { "R", "Target nearest enemy" },
-        { "ZR", "R", "Target nearest friend" },
+        { "ZR", "R", "Target friendly / neutral" },
         { "RStickClick", "Interact: loot, talk, use" },
         { "ZL", "ZR", "Hold: Shift / Ctrl bindings" },
         { "LStickClick", "Autorun" },
@@ -443,6 +443,7 @@ end
 -- be moved to another button in Key Bindings and the right stick click given something else.
 BINDING_HEADER_SWITCHCONTROLS = "Switch Controls"
 BINDING_NAME_SWITCHCONTROLS_INTERACT = "Interact (loot, talk, use)"
+BINDING_NAME_SWITCHCONTROLS_TARGETNONHOSTILE = "Target nearest friendly or neutral"
 local interact = CreateFrame("Button", "SwitchControlsInteract", UIParent)
 interact:SetScript("OnClick", function()
     if not SwitchControls_Interact() then
@@ -821,20 +822,30 @@ local function LoadOptions()
     end
 end
 
--- Interact goes on the right stick click (F17) whenever neither is bound, for this session only: the bindings are never
--- saved from here. (Saving them before the saved ones had loaded once stored a nearly empty set over them.) It is
--- checked again when bindings change, since loading them replaces the current ones; not while the Key Bindings window
--- is open, so it doesn't fight what the player is doing there.
+-- The add-on's actions go on their controller buttons whenever the action has no key and the key is free (or still has
+-- the game's default action there), for this session only: the bindings are never saved from here. (Saving them before
+-- the saved ones had loaded once stored a nearly empty set over them.) Checked again when bindings change, since loading
+-- them replaces the current ones; not while the Key Bindings window is open, so it doesn't fight what the player does.
+--   Interact on the right stick click (F17).
+--   Nearest friendly or neutral on ZR + R (Ctrl+Tab), in place of the game's nearest friend, which skips neutral units
+--   such as travelling merchants.
+local CONTROLLER_BINDINGS = {
+    { key = "F17", action = "SWITCHCONTROLS_INTERACT" },
+    { key = "CTRL-TAB", action = "SWITCHCONTROLS_TARGETNONHOSTILE", replaces = "TARGETNEARESTFRIEND" },
+}
+
 local function BindInteract()
     if InCombatLockdown() or (KeyBindingFrame and KeyBindingFrame:IsShown()) then
         return
     end
 
-    if GetBindingKey("SWITCHCONTROLS_INTERACT") or GetBindingAction("F17") ~= "" then
-        return
-    end
+    for _, binding in ipairs(CONTROLLER_BINDINGS) do
+        local current = GetBindingAction(binding.key)
 
-    SetBinding("F17", "SWITCHCONTROLS_INTERACT")
+        if not GetBindingKey(binding.action) and (current == "" or current == binding.replaces) then
+            SetBinding(binding.key, binding.action)
+        end
+    end
 end
 
 -- Bindings an earlier build of this add-on wiped (see above): a saved set in use (account or character, so they have
