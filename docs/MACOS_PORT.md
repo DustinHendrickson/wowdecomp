@@ -289,8 +289,7 @@ layer. Apple may drop OpenGL at some point.
   layer. The resampler and distortion DSPs use their C paths. `Tools/SoundTest` sets FMOD up the way SoundEngine
   does, checks that CoreAudio is picked (48 kHz stereo PCM16 on an M4), and plays a sample and a file stream in real
   time. It passes; `--audible` plays them out loud.
-- Stubs: `CGLCD` (no Logitech LCD), DivX (movies fail to open; `StartMovie` returns 0 and the glue goes on),
-  `HidManager` with no devices, Battlenet library loading through `dlopen`, BotCheck without SEH, and the patch
+- Stubs: `CGLCD` (no Logitech LCD), `HidManager` with no devices, Battlenet library loading through `dlopen`, BotCheck without SEH, and the patch
   downloader launched through `Blizzard::Process`. `WardenClient.cpp` builds as is. Warden's modules are x86 and
   can't run, so the client needs a server with Warden off. OS and CPU stay `Win` / `x86` in the login packets.
 - `WoW/Source/Mac/main.mm`: ignores SIGPIPE, changes to the game folder, and calls `CommonMain`.
