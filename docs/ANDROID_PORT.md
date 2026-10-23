@@ -96,4 +96,10 @@ Gamepads use the Switch port's mapping (play / cursor modes, the D-pad menu navi
 
 ## Status
 
-Milestone 1 in progress.
+- **Milestone 1 (tooling): done.** JDK 17 (Homebrew), the SDK command-line tools, platform 35, build tools 35, NDK
+  27.2, the emulator and an Android 15 arm64 image; the virtual device `wowtest` (Pixel 7).
+- **Milestone 2 (boots): in progress.** `cmake -S . -B build/android -G Ninja
+  -DCMAKE_TOOLCHAIN_FILE=cmake/AndroidToolchain.cmake` configures, and every shared library compiles. Linking
+  `libwow.so` still needs the Android Os layer (input, window, clipboard, message boxes), the entry point and the GLES
+  device: 33 symbols. Done so far on the Android side: the AAudio output, crash reports (signals into the Switch's
+  crash context and machine-state log), the Registry.txt store, and the adapter's display modes.
