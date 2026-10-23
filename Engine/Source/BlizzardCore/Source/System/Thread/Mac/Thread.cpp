@@ -109,8 +109,9 @@ bool System_Thread::SetPriorityLevel(Blizzard::Thread::ThreadRecord* thread, int
         return false;
     }
 
-#if defined(__SWITCH__)
-    // newlib on the Switch has no POSIX scheduling calls; threads keep the priority they were created with.
+#if defined(__SWITCH__) || defined(__ANDROID__)
+    // newlib on the Switch has no POSIX scheduling calls, and Android's SCHED_OTHER has a single priority: threads keep
+    // the priority they were created with.
     return true;
 #else
     sched_param param;
@@ -240,8 +241,8 @@ bool System_Thread::AllocateTLSSlot(Blizzard::Thread::TLSSlot* slot, Blizzard::T
 
 void System_Thread::InitStackTraceEntryPoint() {
     // Same frame as RtlCaptureStackBackTrace(2, 1, ...): skip this function and ThreadStarter.
-#if defined(__SWITCH__)
-    // No backtrace(); the frame records hold the same return address.
+#if defined(__SWITCH__) || defined(__ANDROID__)
+    // No backtrace() (bionic has it from API 33 only); the frame records hold the same return address.
     SetStackTraceEntryPoint(__builtin_return_address(1));
 #else
     void* frames[3];

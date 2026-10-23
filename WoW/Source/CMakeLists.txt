@@ -4,18 +4,27 @@ if (WOWDECOMP_PLATFORM_MAC)
     file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Mac/*.cpp" "Mac/*.mm")
 elseif (WOWDECOMP_PLATFORM_SWITCH)
     file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Mac/*.cpp" "Switch/*.cpp")
+elseif (WOWDECOMP_PLATFORM_ANDROID)
+    file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Mac/*.cpp" "Android/*.cpp")
 elseif (WOWDECOMP_ARCH_64)
     file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Win64/*.cpp")
 else ()
     file(GLOB PLATFORM_SOURCES CONFIGURE_DEPENDS "Win32/*.cpp")
 endif ()
 
-add_executable(Wow WIN32 MACOSX_BUNDLE ${PRIVATE_SOURCES} ${PLATFORM_SOURCES})
+if (WOWDECOMP_PLATFORM_ANDROID)
+    # NativeActivity loads the game as libwow.so (Tools/Android packages it into the APK).
+    add_library(Wow SHARED ${PRIVATE_SOURCES} ${PLATFORM_SOURCES})
+else ()
+    add_executable(Wow WIN32 MACOSX_BUNDLE ${PRIVATE_SOURCES} ${PLATFORM_SOURCES})
+endif ()
 
 if (WOWDECOMP_PLATFORM_MAC)
     set(WOW_OUTPUT_NAME "World of Warcraft")
 elseif (WOWDECOMP_PLATFORM_SWITCH)
     set(WOW_OUTPUT_NAME Wow)
+elseif (WOWDECOMP_PLATFORM_ANDROID)
+    set(WOW_OUTPUT_NAME wow)
 elseif (WOWDECOMP_ARCH_64)
     set(WOW_OUTPUT_NAME Wow64)
 else ()
@@ -25,6 +34,7 @@ endif ()
 set_target_properties(Wow PROPERTIES
     OUTPUT_NAME ${WOW_OUTPUT_NAME}
     RUNTIME_OUTPUT_DIRECTORY ${WOWDECOMP_BIN_DIR}
+    LIBRARY_OUTPUT_DIRECTORY ${WOWDECOMP_BIN_DIR}
 )
 
 foreach (config ${CMAKE_CONFIGURATION_TYPES} ${CMAKE_BUILD_TYPE})

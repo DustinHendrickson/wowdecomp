@@ -55,14 +55,16 @@ if (WOWDECOMP_PLATFORM_WIN)
     )
 elseif (WOWDECOMP_PLATFORM_SWITCH)
     add_compile_definitions(WOWDECOMP_PLATFORM_SWITCH=1 WOWDECOMP_PLATFORM_POSIX=1)
+elseif (WOWDECOMP_PLATFORM_ANDROID)
+    add_compile_definitions(WOWDECOMP_PLATFORM_ANDROID=1 WOWDECOMP_PLATFORM_POSIX=1)
 else ()
     add_compile_definitions(WOWDECOMP_PLATFORM_MAC=1 WOWDECOMP_PLATFORM_POSIX=1)
 endif ()
 
 # Off by default: the client checks MPQ file MD5s (signaturefile) and GlueXML/FrameXML/AddOn .toc.sig files like the
 # original. ON accepts unsigned or modified game data and interface files.
-# ON by default on the Switch, whose players copy Data from wherever they have it, mods included.
-if (WOWDECOMP_PLATFORM_SWITCH)
+# ON by default on the Switch and Android, whose players copy Data from wherever they have it, mods included.
+if (WOWDECOMP_PLATFORM_SWITCH OR WOWDECOMP_PLATFORM_ANDROID)
     set(WOWDECOMP_SIGNATURE_CHECKS_DEFAULT ON)
 else ()
     set(WOWDECOMP_SIGNATURE_CHECKS_DEFAULT OFF)
@@ -127,7 +129,10 @@ add_subdirectory(WoW/Source/WorldClient)
 add_subdirectory(WoW/Source/WowServices)
 add_subdirectory(WoW/Source/WowSvcs)
 add_subdirectory(WoW/Source)
-add_subdirectory(Tools/WowClient)
+# The plain client executable for terminals; Android's only form is the app (libwow.so).
+if (NOT WOWDECOMP_PLATFORM_ANDROID)
+    add_subdirectory(Tools/WowClient)
+endif ()
 if (WOWDECOMP_PLATFORM_MAC)
     add_subdirectory(Tools/OsWindowTest)
     add_subdirectory(Tools/GxDrawTest)

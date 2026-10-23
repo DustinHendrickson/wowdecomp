@@ -7,6 +7,13 @@ if (NOT WIN32)
     list(FILTER PRIVATE_SOURCES EXCLUDE REGEX "/CGxDevice(D3d|D3d9Ex)/")
 endif ()
 
+if (WOWDECOMP_PLATFORM_ANDROID)
+    # Android has OpenGL ES only: its own device (CGxDeviceGLES) takes the OpenGL device's place.
+    list(FILTER PRIVATE_SOURCES EXCLUDE REGEX "/CGxDeviceOpenGL/")
+else ()
+    list(FILTER PRIVATE_SOURCES EXCLUDE REGEX "/CGxDeviceGLES/")
+endif ()
+
 add_library(Gx STATIC
     ${PRIVATE_SOURCES}
 )

@@ -13,7 +13,9 @@ namespace {
 sockaddr_in ToNative(const ComSat::Network::Address& address) {
     sockaddr_in native;
     memset(&native, 0, sizeof(native));
+#if defined(__APPLE__)
     native.sin_len = sizeof(native);
+#endif
     native.sin_family = AF_INET;
     native.sin_port = address.m_port;
     native.sin_addr.s_addr = address.m_ip;

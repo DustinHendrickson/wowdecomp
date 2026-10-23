@@ -71,7 +71,9 @@ FMOD_RESULT FMOD_OS_Net_Connect(const char *host, const unsigned short port, voi
     }
 
     int value = 1;
+#if defined(SO_NOSIGPIPE)
     setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &value, sizeof(value));
+#endif   /* Android ignores SIGPIPE process-wide instead (WoW/Source/Android/main.cpp). */
 
     /* Connect with the FMOD net timeout, then hand back a blocking socket like the Windows version. */
     fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK);
@@ -119,7 +121,9 @@ FMOD_RESULT FMOD_OS_Net_Listen(const unsigned short port, void **listenhandle)
 
     sockaddr_in address;
     memset(&address, 0, sizeof(address));
+#if defined(__APPLE__)
     address.sin_len         = sizeof(address);
+#endif
     address.sin_family      = AF_INET;
     address.sin_port        = htons(port);
     address.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -149,7 +153,9 @@ FMOD_RESULT FMOD_OS_Net_Accept(const void *listenhandle, void **clienthandle)
     }
 
     int value = 1;
+#if defined(SO_NOSIGPIPE)
     setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &value, sizeof(value));
+#endif   /* Android ignores SIGPIPE process-wide instead (WoW/Source/Android/main.cpp). */
     *clienthandle = Handle(client);
 
     return FMOD_OK;

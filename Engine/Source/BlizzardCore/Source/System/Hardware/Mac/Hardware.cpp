@@ -4,7 +4,9 @@
 // reported because the SSE paths run through sse2neon, MMX and 3DNow! are not. Vendor stays 0 (unknown).
 
 #include <cstdint>
+#if defined(__APPLE__)
 #include <sys/sysctl.h>
+#endif
 #include <unistd.h>
 #include "Engine/Source/BlizzardCore/Source/System/Hardware/Hardware.h"
 #include "Engine/Source/BlizzardCore/Source/System/Lock/Lock.h"
@@ -21,10 +23,18 @@ const uint32_t kFeatureSSE2 = 0x10;
 const uint32_t kFeatureMultiCore = 0x40;
 
 uint32_t SysctlCount(const char* name) {
+#if defined(__APPLE__)
     uint32_t value = 0;
     size_t size = sizeof(value);
 
     return sysctlbyname(name, &value, &size, nullptr, 0) == 0 ? value : 0;
+#elif defined(__ANDROID__)
+    // Logical and physical alike: the cores the kernel knows, big and little.
+    long count = sysconf(_SC_NPROCESSORS_CONF);
+    return count > 0 ? static_cast<uint32_t>(count) : 0;
+#else
+    return 0;
+#endif
 }
 
 }

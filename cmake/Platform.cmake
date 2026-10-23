@@ -6,11 +6,16 @@
 # The Nintendo Switch port (cmake/SwitchToolchain.cmake) builds on the macOS port: most Mac/ code is plain POSIX and is
 # shared. WOWDECOMP_PLATFORM_POSIX covers both. A Switch/ folder next to a Mac/ folder holds the Switch versions; a
 # file there replaces the Mac/ file of the same name, and Objective-C++ (.mm) is macOS only.
+#
+# Android (the NDK's toolchain, cmake/AndroidToolchain.cmake) works the same way, with Android/ folders.
 
 if (WIN32)
     set(WOWDECOMP_PLATFORM_WIN 1)
 elseif (NINTENDO_SWITCH)
     set(WOWDECOMP_PLATFORM_SWITCH 1)
+    set(WOWDECOMP_PLATFORM_POSIX 1)
+elseif (ANDROID)
+    set(WOWDECOMP_PLATFORM_ANDROID 1)
     set(WOWDECOMP_PLATFORM_POSIX 1)
 elseif (APPLE)
     set(WOWDECOMP_PLATFORM_MAC 1)
@@ -20,35 +25,43 @@ elseif (APPLE)
     set(CMAKE_OBJCXX_STANDARD 17)
     set(CMAKE_OBJCXX_STANDARD_REQUIRED ON)
 else ()
-    message(FATAL_ERROR "wowdecomp targets Windows, macOS and the Nintendo Switch only.")
+    message(FATAL_ERROR "wowdecomp targets Windows, macOS, the Nintendo Switch and Android only.")
 endif ()
 
 # Adjusts a module's source list for the current platform: off Windows, drops the Win32/ and Win64/ folders and keeps
-# Mac/ ones, adding their .mm files on macOS; on the Switch, keeps Switch/ folders too, where a file replaces the Mac/
-# file of the same name in the same parent folder. Call it right after the module's file(GLOB_RECURSE...) of *.cpp.
+# Mac/ ones, adding their .mm files on macOS; on the Switch and Android, keeps that platform's Switch/ or Android/
+# folders too, where a file replaces the Mac/ file of the same name in the same parent folder. Call it right after the
+# module's file(GLOB_RECURSE...) of *.cpp.
 function (wowdecomp_platform_sources var)
+    set(overlay "")
+    if (WOWDECOMP_PLATFORM_SWITCH)
+        set(overlay Switch)
+    elseif (WOWDECOMP_PLATFORM_ANDROID)
+        set(overlay Android)
+    endif ()
+
     # Match folder names relative to the module, so a checkout path that happens to contain them doesn't drop sources.
     set(sources "")
-    set(switch_sources "")
+    set(overlay_sources "")
     foreach (source ${${var}})
         file(RELATIVE_PATH relative ${CMAKE_CURRENT_SOURCE_DIR} ${source})
         set(relative "/${relative}")
-        if (WOWDECOMP_PLATFORM_WIN AND relative MATCHES "/(Mac|Switch)/")
+        if (WOWDECOMP_PLATFORM_WIN AND relative MATCHES "/(Mac|Switch|Android)/")
             continue ()
         endif ()
         if (NOT WOWDECOMP_PLATFORM_WIN AND relative MATCHES "/[Ww]in(32|64)/")
             continue ()
         endif ()
-        if (relative MATCHES "/Switch/")
-            if (NOT WOWDECOMP_PLATFORM_SWITCH)
+        if (relative MATCHES "/(Switch|Android)/")
+            if (NOT overlay OR NOT relative MATCHES "/${overlay}/")
                 continue ()
             endif ()
-            list(APPEND switch_sources ${source})
+            list(APPEND overlay_sources ${source})
         endif ()
         list(APPEND sources ${source})
     endforeach ()
-    foreach (source ${switch_sources})
-        string(REGEX REPLACE "/Switch/([^/]+)$" "/Mac/\\1" replaced ${source})
+    foreach (source ${overlay_sources})
+        string(REGEX REPLACE "/${overlay}/([^/]+)$" "/Mac/\\1" replaced ${source})
         list(REMOVE_ITEM sources ${replaced})
     endforeach ()
     if (WOWDECOMP_PLATFORM_MAC)
@@ -94,8 +107,14 @@ macro (wowdecomp_mac_compile_options)
     if (WOWDECOMP_PLATFORM_SWITCH)
         include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/Engine/Source/Base/Compat/Switch)
     endif ()
+    # Darwin headers the shared Mac/ layers include that bionic lacks (<crt_externs.h>), for Android. The NDK makes
+    # non-literal format strings an error; Storm's printf wrappers pass theirs through, as on macOS.
+    if (WOWDECOMP_PLATFORM_ANDROID)
+        include_directories(BEFORE SYSTEM ${CMAKE_SOURCE_DIR}/Engine/Source/Base/Compat/Android)
+        add_compile_options(-Wno-error=format-security)
+    endif ()
     # arm64: <xmmintrin.h> / <emmintrin.h> resolve to sse2neon wrappers.
-    if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64" OR WOWDECOMP_PLATFORM_SWITCH)
+    if (CMAKE_OSX_ARCHITECTURES STREQUAL "arm64" OR WOWDECOMP_PLATFORM_SWITCH OR WOWDECOMP_PLATFORM_ANDROID)
         include_directories(BEFORE SYSTEM
             ${CMAKE_SOURCE_DIR}/Engine/Source/Base/Compat/MacArm64
             ${CMAKE_SOURCE_DIR}/ThirdParty/sse2neon
@@ -108,6 +127,8 @@ if (WOWDECOMP_PLATFORM_WIN)
     set(WOWDECOMP_BIN_DIR ${CMAKE_SOURCE_DIR}/bin/Win)
 elseif (WOWDECOMP_PLATFORM_SWITCH)
     set(WOWDECOMP_BIN_DIR ${CMAKE_SOURCE_DIR}/bin/Switch)
+elseif (WOWDECOMP_PLATFORM_ANDROID)
+    set(WOWDECOMP_BIN_DIR ${CMAKE_SOURCE_DIR}/bin/Android)
 else ()
     set(WOWDECOMP_BIN_DIR ${CMAKE_SOURCE_DIR}/bin/Mac)
 endif ()

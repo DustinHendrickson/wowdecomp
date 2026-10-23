@@ -23,3 +23,8 @@ target_link_libraries(Storm
         bzip2
         zlib
 )
+
+if (WOWDECOMP_PLATFORM_ANDROID)
+    # Error texts also go to Android's log (Source/Android/SErrCrash.cpp).
+    target_link_libraries(Storm PUBLIC log)
+endif ()

@@ -94,7 +94,7 @@ void OsCallInitialize(const char* name) {
 
     OsCallThread* thread = new (SMemAlloc(sizeof(OsCallThread), __FILE__, __LINE__, SMEM_FLAG_ZEROMEMORY)) OsCallThread;
     thread->m_threadId = MacWaitable::CurrentThreadId();
-    thread->m_threadHandle = pthread_self();
+    thread->m_threadHandle = reinterpret_cast<void*>(pthread_self());
     SStrPrintf(thread->m_name, sizeof(thread->m_name), "%s [%u]", name, thread->m_threadId);
     OsTlsSetValue(s_tlsIndex, thread);
     s_threadList.LinkToTail(thread);

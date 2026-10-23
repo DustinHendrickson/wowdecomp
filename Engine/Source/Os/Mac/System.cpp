@@ -15,6 +15,12 @@
 #include <pwd.h>
 #include <spawn.h>
 #include <sys/sysctl.h>
+#elif defined(__ANDROID__)
+#include <link.h>
+#include <pwd.h>
+#include <sys/sysinfo.h>
+#include <sys/system_properties.h>
+#include "Engine/Source/Os/Android/AndroidSystem.h"
 #else
 #include "Engine/Source/Os/Switch/NxSystem.h"
 #endif
@@ -28,6 +34,7 @@
 
 #if defined(__APPLE__)
 extern char** environ;
+#elif defined(__ANDROID__)
 #else
 // The code segment, from libnx's linker script.
 extern "C" char __code_start[];
@@ -54,6 +61,9 @@ uint32_t SysctlCount(const char* name) {
     uint32_t value = 0;
     size_t size = sizeof(value);
     return sysctlbyname(name, &value, &size, nullptr, 0) == 0 ? value : 0;
+#elif defined(__ANDROID__)
+    long count = sysconf(_SC_NPROCESSORS_CONF);
+    return count > 0 ? static_cast<uint32_t>(count) : 1;
 #else
     // Applications get three of the Tegra X1's four Cortex-A57 cores; the fourth belongs to the system.
     return 3;
@@ -84,6 +94,15 @@ int32_t IOsGetProcessorFeatures(CpuIdInfo* info) {
 #if defined(__APPLE__)
     size_t size = sizeof(info->m_brand) - 1;
     sysctlbyname("machdep.cpu.brand_string", info->m_brand, &size, nullptr, 0);
+#elif defined(__ANDROID__)
+    // The chip, as the system names it (ro.soc.model: "SM8550", "Tensor G3"...), else the board.
+    char model[PROP_VALUE_MAX] = "";
+
+    if (__system_property_get("ro.soc.model", model) <= 0) {
+        __system_property_get("ro.board.platform", model);
+    }
+
+    SStrPrintf(info->m_brand, sizeof(info->m_brand), "%s (ARM64)", model[0] ? model : "Android");
 #else
     SStrCopy(info->m_brand, "NVIDIA Tegra X1 (ARM Cortex-A57)", sizeof(info->m_brand));
 #endif
@@ -192,6 +211,9 @@ int32_t OsGetUserName(char* buffer, uint32_t* size) {
 uint64_t OsGetPhysicalMemory() {
 #if defined(__SWITCH__)
     return NxGetTotalMemory();
+#elif defined(__ANDROID__)
+    struct sysinfo info;
+    return sysinfo(&info) == 0 ? static_cast<uint64_t>(info.totalram) * info.mem_unit : 0;
 #else
     uint64_t memory = 0;
     size_t size = sizeof(memory);
@@ -210,6 +232,29 @@ void OsFindTextSectionBounds() {
 #if defined(__SWITCH__)
     s_textStart = reinterpret_cast<uintptr_t>(__code_start);
     s_textEnd = reinterpret_cast<uintptr_t>(__rodata_start);
+    return;
+#elif defined(__ANDROID__)
+    // The executable segment of libwow.so, the library this code is in.
+    dl_iterate_phdr([](dl_phdr_info* info, size_t size, void* param) -> int {
+        uintptr_t self = reinterpret_cast<uintptr_t>(param);
+
+        for (int i = 0; i < info->dlpi_phnum; i++) {
+            const ElfW(Phdr)& header = info->dlpi_phdr[i];
+
+            if (header.p_type == PT_LOAD && (header.p_flags & PF_X)) {
+                uintptr_t start = info->dlpi_addr + header.p_vaddr;
+                uintptr_t end = start + header.p_memsz;
+
+                if (self >= start && self < end) {
+                    s_textStart = start;
+                    s_textEnd = end;
+                    return 1;
+                }
+            }
+        }
+
+        return 0;
+    }, reinterpret_cast<void*>(&OsFindTextSectionBounds));
     return;
 #else
     unsigned long size = 0;
@@ -277,6 +322,8 @@ int32_t OsLaunchURL(const char* url) {
 
 #if defined(__SWITCH__)
     return NxOpenURL(file);
+#elif defined(__ANDROID__)
+    return AndroidOpenURL(file);
 #else
     char* argv[] = { const_cast<char*>("/usr/bin/open"), file, nullptr };
     pid_t process;

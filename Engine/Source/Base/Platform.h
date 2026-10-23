@@ -122,6 +122,26 @@ static inline uint32_t pthread_mach_thread_np(pthread_t thread) {
 }
 #endif
 
+#if defined(__ANDROID__)
+#include <time.h>
+
+// Darwin calls the shared Mac/ layers use, on Android (bionic is a Linux libc).
+#define CLOCK_UPTIME_RAW CLOCK_MONOTONIC
+
+static inline uint64_t clock_gettime_nsec_np(int clock) {
+    struct timespec now;
+    clock_gettime(clock, &now);
+    return (uint64_t)now.tv_sec * 1000000000ull + (uint64_t)now.tv_nsec;
+}
+
+// Darwin's pthread_setname_np names the calling thread (Linux's takes the thread too); Mach thread ports become the
+// kernel thread id.
+#define pthread_setname_np(name) pthread_setname_np(pthread_self(), (name))
+static inline uint32_t pthread_mach_thread_np(pthread_t thread) {
+    return (uint32_t)pthread_gettid_np(thread);
+}
+#endif
+
 // Calling conventions: meaningful on x86 only. Windows x64 ignores them too.
 #define __stdcall
 #define __cdecl

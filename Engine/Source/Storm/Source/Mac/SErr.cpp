@@ -8,7 +8,8 @@
 //
 // The Switch build shares the file. There the dialog is the system error applet (one button, which takes the default
 // answer), and crashes come from libnx's exception handler (Storm/Source/Switch/SErrCrash.cpp) with a
-// SwitchCrashContext in place of the ucontext.
+// SwitchCrashContext in place of the ucontext. Android takes the same path: its crash signal handler
+// (Storm/Source/Android/SErrCrash.cpp) fills a SwitchCrashContext from the signal's ucontext.
 
 #if defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
@@ -112,12 +113,16 @@ int32_t (STORMAPI* s_logCallback)(char*, uint32_t);
 uint32_t s_noMiniDumps;
 char s_logLastFile[MAX_PATH];
 
-#if defined(__SWITCH__)
-typedef SwitchCrashContext ucontext_t;
+// What the crash handler hands over: the faulting thread's ucontext on macOS, a SwitchCrashContext on the Switch and
+// Android.
+#if defined(__SWITCH__) || defined(__ANDROID__)
+typedef SwitchCrashContext CrashContext;
+#else
+typedef ucontext_t CrashContext;
 #endif
 
-// Set by the crash handler for the error it reports: the faulting thread's ucontext.
-ucontext_t* s_crashContext;
+// Set by the crash handler for the error it reports.
+CrashContext* s_crashContext;
 
 const char* GetErrorString(uint32_t id) {
     return s_displaystr[id];
@@ -139,7 +144,7 @@ void InternalLeaveCriticalSection(CRITICAL_SECTION* critsect) {
 }
 
 int32_t CanBreakToDebugger() {
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__ANDROID__)
     return 0;
 #else
     kinfo_proc info = {};
@@ -289,7 +294,7 @@ int32_t UndecorateObjectName(const char* source, char* dest, uint32_t destchars)
     return 1;
 }
 
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__ANDROID__)
 int32_t ShowAlert(const char* title, const char* text, bool warning, const char* const* buttons, const int32_t* results, int32_t buttonCount) {
     SwitchShowErrorText(title, text);
     return results[0];
@@ -506,7 +511,7 @@ int32_t STORMAPI SErrDisplayError(uint32_t errorcode, const char* filename, int3
     uint32_t pathsize = sizeof(appfilename);
     appfilename[0] = 0;
 
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__ANDROID__)
     (void)pathsize;
     SStrCopy(appfilename, "World of Warcraft", sizeof(appfilename));
 #else
@@ -592,7 +597,7 @@ int32_t STORMAPI SErrDisplayError(uint32_t errorcode, const char* filename, int3
     if (!g_opt.serrsuppresslogs) {
         LoadMachineStateSymbols();
         InternalEnterCriticalSection(&s_exceptioncritsect);
-        ucontext_t* context = s_crashContext;
+        CrashContext* context = s_crashContext;
         s_crashContext = nullptr;
         InternalLeaveCriticalSection(&s_exceptioncritsect);
 
@@ -775,7 +780,7 @@ int32_t SErrDisplayErrorFmt(uint32_t errorcode, const char* filename, int32_t li
     return SErrDisplayError(errorcode, filename, linenumber, buffer, recoverable, exitcode, 0x11111111);
 }
 
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__ANDROID__)
 void SwitchReportCrash(SwitchCrashContext* context) {
     InternalEnterCriticalSection(&s_exceptioncritsect);
 

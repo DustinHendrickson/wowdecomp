@@ -19,7 +19,7 @@ static bool s_continueAfterAssert;
 namespace {
 
 bool DebuggerAttached() {
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__ANDROID__)
     return false;
 #else
     kinfo_proc info = {};

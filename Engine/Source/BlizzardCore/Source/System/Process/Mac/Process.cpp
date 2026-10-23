@@ -55,7 +55,7 @@ bool Blizzard::Process::GetProcessPath(char* buffer, int32_t buffersize) {
         return false;
     }
 
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__ANDROID__)
     const char* argv0 = *_NSGetArgc() > 0 && (*_NSGetArgv())[0] ? (*_NSGetArgv())[0] : "";
     Blizzard::String::Copy(buffer, argv0, buffersize);
     return true;
@@ -149,7 +149,8 @@ bool Blizzard::Process::LaunchChildProcessWithArguments(const char* path, const 
 
     pid_t process;
 
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__ANDROID__)
+    // No other processes to start: the Switch has none, an Android app can't run the game's tools.
     return false;
 #else
     if (posix_spawn(&process, path, nullptr, nullptr, argv.data(), environ) != 0) {

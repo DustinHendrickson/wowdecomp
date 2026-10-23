@@ -25,7 +25,8 @@ uint32_t GetModuleFileNameUTF8(void* module, char* path, uint32_t size) {
         return 0;
     }
 
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__ANDROID__)
+    // Android: the activity's stand-in argv[0] is a file in the game folder (WoW/Source/Android/main.cpp).
     (void)length;
     const char* argv0 = *_NSGetArgc() > 0 && (*_NSGetArgv())[0] && (*_NSGetArgv())[0][0] ? (*_NSGetArgv())[0] : "sdmc:/switch/wow/WoW.nro";
     strncpy(executable, argv0, sizeof(executable) - 1);

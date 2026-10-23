@@ -16,7 +16,9 @@ static_assert(sizeof(NETADDR) >= sizeof(sockaddr_in), "NETADDR must hold a socka
 void OsNetAddrMake(uint32_t address, uint16_t port, NETADDR* addr) {
     sockaddr_in* in = reinterpret_cast<sockaddr_in*>(addr);
     memset(in, 0, sizeof(*in));
+#if defined(__APPLE__)
     in->sin_len = sizeof(sockaddr_in);
+#endif
     in->sin_family = AF_INET;
     in->sin_port = htons(port);
     in->sin_addr.s_addr = address;

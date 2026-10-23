@@ -32,6 +32,16 @@ elseif (WOWDECOMP_PLATFORM_SWITCH)
         ${FMODEX_DIR}/win32/src/fmod_dsp_resampler_linear.cpp
         ${FMODEX_DIR}/win32/src/fmod_dsp_distortion.cpp
     )
+elseif (WOWDECOMP_PLATFORM_ANDROID)
+    # The same shared layers, with an AAudio output.
+    set(FMODEX_PLATFORM_DIR ${FMODEX_DIR}/android/src)
+    file(GLOB FMODEX_PLATFORM_SOURCES CONFIGURE_DEPENDS "${FMODEX_PLATFORM_DIR}/*.cpp")
+    list(APPEND FMODEX_PLATFORM_SOURCES
+        ${FMODEX_DIR}/mac/src/fmod_os_misc.cpp
+        ${FMODEX_DIR}/mac/src/fmod_os_net.cpp
+        ${FMODEX_DIR}/win32/src/fmod_dsp_resampler_linear.cpp
+        ${FMODEX_DIR}/win32/src/fmod_dsp_distortion.cpp
+    )
 else ()
     set(FMODEX_PLATFORM_DIR ${FMODEX_DIR}/mac/src)
     file(GLOB FMODEX_PLATFORM_SOURCES CONFIGURE_DEPENDS
@@ -46,6 +56,10 @@ else ()
 endif ()
 
 add_library(fmodex STATIC ${FMODEX_SOURCES} ${FMODEX_PLATFORM_SOURCES})
+
+if (WOWDECOMP_PLATFORM_ANDROID)
+    target_link_libraries(fmodex PUBLIC aaudio)
+endif ()
 
 target_include_directories(fmodex
     PUBLIC

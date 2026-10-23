@@ -36,7 +36,7 @@
     /*#define PLATFORM_WINDOWS_PS3MODE*/      /* Emulation of PS3 (uses alternate mixer) */
     /*#define FMOD_SUPPORT_HARDWAREXM*/       /* Emulation of PS2/PSP hardware xm support (uses dsound buffers) */
 
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(__ANDROID__)   /* wowdecomp: Android has its own case below */
 
     #define PLATFORM_LINUX
     #define PLATFORM_ENDIAN_LITTLE
@@ -72,6 +72,14 @@
     /* wowdecomp: the Nintendo Switch build shares the macOS port's POSIX layer, with its own audio output. */
     #define PLATFORM_MAC
     #define PLATFORM_SWITCH
+    #define PLATFORM_64BIT
+    #define PLATFORM_ENDIAN_LITTLE
+
+#elif defined(__ANDROID__)
+
+    /* wowdecomp: Android shares the macOS port's POSIX layer too, with an AAudio output. */
+    #define PLATFORM_MAC
+    #define PLATFORM_WOW_ANDROID
     #define PLATFORM_64BIT
     #define PLATFORM_ENDIAN_LITTLE
 
@@ -698,7 +706,7 @@
 
 #elif defined(PLATFORM_MAC)
 
-    #if !defined(PLATFORM_SWITCH)
+    #if !defined(PLATFORM_SWITCH) && !defined(PLATFORM_WOW_ANDROID)
     #define FMOD_SUPPORT_COREAUDIO
     #define FMOD_SUPPORT_VSTPLUGIN   
     #endif

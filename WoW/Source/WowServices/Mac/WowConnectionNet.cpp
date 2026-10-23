@@ -222,8 +222,10 @@ void WowConnectionNet::PlatformAdd(WowConnection* connection) {
     int value = 1;
     setsockopt(connection->m_sock, IPPROTO_TCP, TCP_NODELAY, &value, sizeof(value));
 
-    // A write to a closed connection must fail, not raise SIGPIPE.
+    // A write to a closed connection must fail, not raise SIGPIPE. (Android ignores SIGPIPE process-wide instead.)
+#if defined(SO_NOSIGPIPE)
     setsockopt(connection->m_sock, SOL_SOCKET, SO_NOSIGPIPE, &value, sizeof(value));
+#endif
 
     Wake(this->m_event);
 }
