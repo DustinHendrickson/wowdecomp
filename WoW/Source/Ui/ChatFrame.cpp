@@ -2540,13 +2540,13 @@ int32_t CGChat::OnChannelNotify(void* param, NETMESSAGE msgId, uint32_t time, CD
             type = CHAT_MSG_CHANNEL_NOTICE;
             ChatChannel* channel = zoneChannelID ? CGChat::GetChannelByChatChannelID(zoneChannelID) : GetChannelByName(channelName);
 
-            if (channel) {
-                if (channel->m_unkA0 || !suspended) {
-                    SStrCopy(text, "YOU_LEFT", sizeof(text));
-                    reset = 1;
-                } else {
-                    SStrCopy(text, "SUSPENDED", sizeof(text));
-                }
+            // A channel the client no longer tracks (left already while changing zones) is still left. Without a notice
+            // name, ChatFrame's CHANNEL_NOTICE handler formats a nil string and raises a Lua error.
+            if (!channel || channel->m_unkA0 || !suspended) {
+                SStrCopy(text, "YOU_LEFT", sizeof(text));
+                reset = 1;
+            } else {
+                SStrCopy(text, "SUSPENDED", sizeof(text));
             }
 
             CGChat::LeftChannel(zoneChannelID, channelName);
@@ -2825,7 +2825,9 @@ int32_t CGChat::OnChannelNotify(void* param, NETMESSAGE msgId, uint32_t time, CD
         }
     }
 
-    CGChat::AddChatMessage(text, type, senderName, 0, displayName, nullptr, nullptr, guid, 0, targetGuid, 0, false, nullptr);
+    if (text[0]) {
+        CGChat::AddChatMessage(text, type, senderName, 0, displayName, nullptr, nullptr, guid, 0, targetGuid, 0, false, nullptr);
+    }
 
     if (reset) {
         CGChat::ResetChannel(zoneChannelID, channelName);
